@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eo"
+version = "0.1.0"
+description = "Structured extraction over the corpus of U.S. Executive Orders"
+requires-python = ">=3.12"
+# Pinned to what was resolved and tested on 2026-09-03.
+dependencies = [
+    "httpx==0.28.1",
+    "pydantic==2.13.5",
+    "tenacity==9.1.4",
+    "typer==0.27.2",
+    "pandas==3.0.5",
+    "python-dotenv==1.2.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "ruff==0.16.5"]
+
+[project.scripts]
+eo = "eo.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

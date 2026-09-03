@@ -1,4 +1,6 @@
-my_secrets.py
 .venv
 __pycache__
 *.pdf
+data/
+.env
+my_secrets.py
