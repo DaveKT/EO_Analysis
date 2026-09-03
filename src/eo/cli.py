@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import typer
 
-from eo import __version__, db
+from eo import __version__, db, ingest
 from eo.config import API_KEY_VAR, Settings, load_settings
 
 app = typer.Typer(
@@ -73,12 +73,95 @@ def status() -> None:
     if not counts["documents"]:
         typer.echo("")
         typer.echo("empty database — next step is `eo fetch` (Phase 1).")
+        return
+
+    with db.session(settings.db_path) as con:
+        health = db.ingest_health(con)
+
+    typer.echo("")
+    typer.echo("ingest health:")
+    lo, hi = health["eo_range"]
+    first, last = health["date_range"]
+    typer.echo(f"  EO numbers      {lo} → {hi}")
+    typer.echo(f"  signing dates   {first} → {last}")
+    typer.echo(f"  mean body       {health['avg_chars']:,.0f} chars")
+    typer.echo(f"  with FR notes   {health['with_disposition_notes']:,}")
+
+    short = health["short_bodies"]
+    colour = typer.colors.RED if short else typer.colors.GREEN
+    typer.secho(
+        f"  bodies < 500 chars {short:>5}  [{'FAIL' if short else 'ok'}]", fg=colour
+    )
+
+    # Not a failure: the FR "executive_order" filter also returns a handful of
+    # annexes and notices, which FR itself leaves without an EO number. They are
+    # kept for completeness and excluded from extraction.
+    non_eo = health["missing_eo_number"]
+    typer.echo(f"  no eo_number       {non_eo:>5}  [annex/notice, not extracted]")
+    typer.echo(
+        f"  extractable        {health['extractable']:>5}"
+        "  [one canonical row per EO number]"
+    )
+
+    typer.echo("")
+    typer.echo("by president:")
+    for row in health["by_president"]:
+        typer.echo(
+            f"  {row['president'] or '(unknown)':<22} {row['n']:>5}"
+            f"   {row['lo']} → {row['hi']}"
+        )
 
 
 @app.command()
-def fetch() -> None:
-    """Ingest Executive Orders from the Federal Register API."""
-    _not_yet("fetch", "Phase 1")
+def fetch(
+    limit: int = typer.Option(
+        None, "--limit", "-n", help="Stop after this many records (for testing)."
+    ),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Re-fetch and overwrite documents already stored."
+    ),
+    per_page: int = typer.Option(100, "--per-page", help="API page size."),
+) -> None:
+    """Ingest Executive Orders from the Federal Register API.
+
+    Idempotent: documents already stored with a usable body are skipped, so an
+    interrupted run is resumed simply by running the command again.
+    """
+    settings = load_settings()
+    settings.raw_dir.mkdir(parents=True, exist_ok=True)
+
+    def progress(report: ingest.Report, record: dict) -> None:
+        if report.inserted % 50 == 0 or report.inserted == 1:
+            typer.echo(
+                f"  [{report.inserted:>5}] EO {record.get('executive_order_number')}"
+                f" {record.get('signing_date')}  {(record.get('title') or '')[:52]}"
+            )
+
+    typer.echo("fetching from the Federal Register API (no model calls)...")
+    with db.session(settings.db_path) as con:
+        report = ingest.ingest(
+            con,
+            settings.raw_dir,
+            limit=limit,
+            refresh=refresh,
+            per_page=per_page,
+            on_progress=progress,
+        )
+
+    typer.echo("")
+    typer.echo(report.summary())
+
+    if report.failures:
+        typer.secho(
+            f"\n{len(report.failures)} document(s) failed and were NOT stored:",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        for doc_num, reason in report.failures[:25]:
+            typer.echo(f"  {doc_num}: {reason}", err=True)
+        if len(report.failures) > 25:
+            typer.echo(f"  ... and {len(report.failures) - 25} more", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()

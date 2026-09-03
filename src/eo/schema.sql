@@ -99,3 +99,28 @@ CREATE INDEX IF NOT EXISTS idx_authorities_doc ON authorities (document_number, 
 CREATE INDEX IF NOT EXISTS idx_relationships_doc ON relationships (document_number, run_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships (target_eo_number);
 
+-- The set of documents Phase 3 actually extracts from.
+--
+-- The Federal Register's "executive_order" filter returns more than executive
+-- orders, and it publishes some orders more than once:
+--   * C1-/Z9- prefixes are short "change X to Y" correction notices.
+--   * R1- prefixes are reprints, which supersede the original publication.
+--   * Some documents (annexes, notices, military orders, CFIUS orders) get no
+--     EO number from FR at all.
+-- Ground truth in `documents` is left intact; this view picks one canonical row
+-- per EO number.
+CREATE VIEW IF NOT EXISTS extractable_documents AS
+SELECT d.*
+FROM documents d
+WHERE d.eo_number IS NOT NULL
+  AND d.document_number NOT LIKE 'C1-%'
+  AND d.document_number NOT LIKE 'Z9-%'
+  AND d.document_number = (
+    SELECT d2.document_number
+    FROM documents d2
+    WHERE d2.eo_number = d.eo_number
+      AND d2.document_number NOT LIKE 'C1-%'
+      AND d2.document_number NOT LIKE 'Z9-%'
+    ORDER BY d2.publication_date DESC, d2.body_char_count DESC
+    LIMIT 1
+  );

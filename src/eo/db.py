@@ -54,3 +54,38 @@ TABLES = (
 def table_counts(con: sqlite3.Connection) -> dict[str, int]:
     return {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in TABLES}
 
+
+def ingest_health(con: sqlite3.Connection) -> dict[str, object]:
+    """Facts the Phase 1 exit gate is judged on."""
+    row = con.execute(
+        "SELECT COUNT(*) n, MIN(eo_number) lo, MAX(eo_number) hi,"
+        " MIN(signing_date) first_date, MAX(signing_date) last_date,"
+        " AVG(body_char_count) avg_chars"
+        " FROM documents"
+    ).fetchone()
+    short = con.execute(
+        "SELECT COUNT(*) FROM documents WHERE body_char_count < 500"
+    ).fetchone()[0]
+    missing_eo = con.execute(
+        "SELECT COUNT(*) FROM documents WHERE eo_number IS NULL"
+    ).fetchone()[0]
+    with_notes = con.execute(
+        "SELECT COUNT(*) FROM documents"
+        " WHERE disposition_notes IS NOT NULL AND disposition_notes != ''"
+    ).fetchone()[0]
+    extractable = con.execute("SELECT COUNT(*) FROM extractable_documents").fetchone()[0]
+    by_president = con.execute(
+        "SELECT president, COUNT(*) n, MIN(signing_date) lo, MAX(signing_date) hi"
+        " FROM documents GROUP BY president ORDER BY lo"
+    ).fetchall()
+    return {
+        "count": row["n"],
+        "eo_range": (row["lo"], row["hi"]),
+        "date_range": (row["first_date"], row["last_date"]),
+        "avg_chars": row["avg_chars"] or 0,
+        "short_bodies": short,
+        "missing_eo_number": missing_eo,
+        "with_disposition_notes": with_notes,
+        "extractable": extractable,
+        "by_president": by_president,
+    }

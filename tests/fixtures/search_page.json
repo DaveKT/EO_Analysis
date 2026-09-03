@@ -1,0 +1,92 @@
+{
+  "description": "Documents of type Presidential Document and of presidential document type Executive Order",
+  "count": 1559,
+  "total_pages": 50,
+  "next_page_url": "https://www.federalregister.gov/api/v1/documents?conditions%5Bpresidential_document_type%5D%5B%5D=executive_order&conditions%5Btype%5D%5B%5D=PRESDOCU&fields%5B%5D=document_number&fields%5B%5D=executive_order_number&fields%5B%5D=title&fields%5B%5D=president&fields%5B%5D=signing_date&fields%5B%5D=publication_date&fields%5B%5D=citation&fields%5B%5D=pdf_url&fields%5B%5D=raw_text_url&fields%5B%5D=disposition_notes&fields%5B%5D=agencies&fields%5B%5D=start_page&fields%5B%5D=end_page&format=json&order=oldest&page=2&per_page=3&search_after_cursor=Wzc1OTAyNDAwMDAwMCwiOTQtMTUzMiJd",
+  "results": [
+    {
+      "document_number": "94-290",
+      "executive_order_number": "12890",
+      "title": "Amendment to Executive Order No. 12864",
+      "president": {
+        "identifier": "william-j-clinton",
+        "name": "William J. Clinton"
+      },
+      "signing_date": "1993-12-30",
+      "publication_date": "1994-01-05",
+      "citation": "59 FR 499",
+      "pdf_url": null,
+      "raw_text_url": "https://www.federalregister.gov/documents/full_text/text/1994/01/05/94-290.txt",
+      "disposition_notes": null,
+      "agencies": [
+        {
+          "raw_name": "EXECUTIVE OFFICE OF THE PRESIDENT",
+          "name": "Executive Office of the President",
+          "id": 538,
+          "url": "https://www.federalregister.gov/agencies/executive-office-of-the-president",
+          "json_url": "https://www.federalregister.gov/api/v1/agencies/538",
+          "parent_id": null,
+          "slug": "executive-office-of-the-president"
+        }
+      ],
+      "start_page": 499,
+      "end_page": 499
+    },
+    {
+      "document_number": "94-1531",
+      "executive_order_number": "12891",
+      "title": "Advisory Committee on Human Radiation Experiments",
+      "president": {
+        "identifier": "william-j-clinton",
+        "name": "William J. Clinton"
+      },
+      "signing_date": "1994-01-15",
+      "publication_date": "1994-01-20",
+      "citation": "59 FR 2935",
+      "pdf_url": null,
+      "raw_text_url": "https://www.federalregister.gov/documents/full_text/text/1994/01/20/94-1531.txt",
+      "disposition_notes": "Revoked by: EO 13062, September 29, 1997",
+      "agencies": [
+        {
+          "raw_name": "EXECUTIVE OFFICE OF THE PRESIDENT",
+          "name": "Executive Office of the President",
+          "id": 538,
+          "url": "https://www.federalregister.gov/agencies/executive-office-of-the-president",
+          "json_url": "https://www.federalregister.gov/api/v1/agencies/538",
+          "parent_id": null,
+          "slug": "executive-office-of-the-president"
+        }
+      ],
+      "start_page": 2935,
+      "end_page": 2937
+    },
+    {
+      "document_number": "94-1532",
+      "executive_order_number": "12892",
+      "title": "Leadership and Coordination of Fair Housing in Federal Programs: Affirmatively Furthering Fair Housing",
+      "president": {
+        "identifier": "william-j-clinton",
+        "name": "William J. Clinton"
+      },
+      "signing_date": "1994-01-17",
+      "publication_date": "1994-01-20",
+      "citation": "59 FR 2939",
+      "pdf_url": null,
+      "raw_text_url": "https://www.federalregister.gov/documents/full_text/text/1994/01/20/94-1532.txt",
+      "disposition_notes": "Amends: EO 11063, November 20, 1962\r\nRevokes: EO 11063, November 20, 1962 (in part); EO 12259, December 31, 1980\r\nSee: Memorandum, January 17, 1994",
+      "agencies": [
+        {
+          "raw_name": "EXECUTIVE OFFICE OF THE PRESIDENT",
+          "name": "Executive Office of the President",
+          "id": 538,
+          "url": "https://www.federalregister.gov/agencies/executive-office-of-the-president",
+          "json_url": "https://www.federalregister.gov/api/v1/agencies/538",
+          "parent_id": null,
+          "slug": "executive-office-of-the-president"
+        }
+      ],
+      "start_page": 2939,
+      "end_page": 2943
+    }
+  ]
+}
