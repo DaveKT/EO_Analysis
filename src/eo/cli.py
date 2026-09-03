@@ -7,9 +7,13 @@ command surface is visible, and each fails loudly rather than pretending to work
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
+
 import typer
 
-from eo import __version__, db, dispositions, ingest
+from eo import __version__, db, dispositions, ingest, prompts
+from eo import extract as extract_mod
 from eo.config import API_KEY_VAR, Settings, load_settings
 
 app = typer.Typer(
@@ -181,9 +185,98 @@ def fetch(
 
 
 @app.command()
-def extract() -> None:
+def extract(
+    limit: int = typer.Option(None, "--limit", "-n", help="Extract at most N orders."),
+    spread: bool = typer.Option(
+        True, "--spread/--no-spread",
+        help="Sample evenly across presidencies rather than taking the oldest N.",
+    ),
+    run_id: int = typer.Option(
+        None, "--run-id", help="Resume an existing run, skipping what it already has."
+    ),
+    model: str = typer.Option(None, "--model", help="Override the configured model."),
+    concurrency: int = typer.Option(None, "--concurrency", help="Parallel requests."),
+    max_tokens: int = typer.Option(None, "--max-tokens", help="Output cap per call."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be sent. No API calls, no cost."
+    ),
+) -> None:
     """Run the LLM extraction pass over ingested documents."""
-    _not_yet("extract", "Phase 3")
+    settings = load_settings()
+    overrides = {}
+    if model:
+        overrides["model"] = model
+    if concurrency:
+        overrides["concurrency"] = concurrency
+    if max_tokens:
+        overrides["max_tokens"] = max_tokens
+    settings = replace(settings, **overrides)
+
+    with db.session(settings.db_path) as con:
+        selected = extract_mod.select_documents(
+            con, limit=limit, run_id=run_id, spread=spread
+        )
+        sendable, too_short = extract_mod.filter_extractable(selected)
+
+        if too_short:
+            # Never sent to a model: v1 did exactly this and got fiction back.
+            typer.secho(
+                f"skipping {len(too_short)} document(s) with too little text",
+                fg=typer.colors.YELLOW,
+            )
+
+        if not sendable:
+            typer.echo("nothing to extract.")
+            return
+
+        chars = sum(len(d["body_text"]) for d in sendable)
+        typer.echo(f"model         {settings.model}")
+        typer.echo(f"prompt        {prompts.PROMPT_VERSION}")
+        typer.echo(f"documents     {len(sendable)}")
+        typer.echo(f"input size    {chars:,} chars (~{chars // 4:,} tokens)")
+        typer.echo(f"concurrency   {settings.concurrency}")
+        typer.echo(f"max_tokens    {settings.max_tokens}")
+
+        if dry_run:
+            typer.echo("")
+            typer.echo("dry run — no API calls made. First five:")
+            for document in sendable[:5]:
+                typer.echo(
+                    f"  EO {document['eo_number']} {document['signing_date']}"
+                    f"  {len(document['body_text']):>7,} chars"
+                    f"  {(document['title'] or '')[:44]}"
+                )
+            return
+
+        settings.require_api_key()
+        active_run = run_id or extract_mod.start_run(con, settings.model)
+        typer.echo(f"run_id        {active_run}")
+        typer.echo("")
+
+        def progress(report: extract_mod.RunReport, document: dict, status: str) -> None:
+            mark = {"ok": " ", "failed": "!", "truncated": "T", "invalid": "?"}[status]
+            typer.echo(
+                f" {mark} [{report.attempted:>4}/{len(sendable)}] EO"
+                f" {document['eo_number']}  ${report.cost_usd:.4f}"
+                f"  {(document['title'] or '')[:46]}"
+            )
+
+        report = asyncio.run(
+            extract_mod.extract_all(
+                con, settings, sendable, run_id=active_run,
+                max_tokens=settings.max_tokens, on_progress=progress,
+            )
+        )
+        report.skipped_short = len(too_short)
+        extract_mod.finish_run(con, report)
+
+    typer.echo("")
+    typer.echo(report.summary())
+    if report.failed:
+        typer.secho(f"\n{len(report.failed)} failure(s):", fg=typer.colors.RED, err=True)
+        for doc_num, reason in report.failed[:20]:
+            typer.echo(f"  {doc_num}: {reason}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()

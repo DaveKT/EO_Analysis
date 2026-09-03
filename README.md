@@ -50,7 +50,7 @@ returns, run commands as `PYTHONPATH=src .venv/bin/python -m eo.cli ...`.
 ```sh
 eo status     # configuration, row counts, ingest health
 eo fetch      # Phase 1: ingest from the Federal Register (free, no model calls)
-eo extract    # Phase 3: the LLM pass                      (not yet implemented)
+eo extract    # Phase 3: the LLM pass
 eo validate   # Phase 4: quality gates                     (not yet implemented)
 eo export     # Phase 5: CSV/Parquet                       (not yet implemented)
 ```
@@ -75,6 +75,21 @@ Both axes admit `other`, which requires a written reason, and Phase 4 fails any
 run where `other` exceeds 3%. A forced choice would make a vocabulary gap
 indistinguishable from a good fit — the class of silent failure this rebuild
 exists to prevent.
+
+## Extraction runs
+
+```sh
+eo extract --limit 25 --dry-run     # what would be sent, and how big. No cost.
+eo extract --limit 25               # pilot: samples evenly across presidencies
+eo extract --run-id 1 --limit 25    # resume: retries only what failed
+```
+
+A run is identified by `(model, prompt_version)` and records its own token
+counts and cost. Documents are committed as each completes, so an interrupted
+run keeps everything finished so far. Resuming re-offers rows that came back
+truncated or unparsable — a failed row is work still to do, not work done —
+and samples before filtering, so `--limit 25 --run-id N` means the same 25
+orders every time.
 
 ## Design
 

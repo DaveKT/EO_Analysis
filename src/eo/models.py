@@ -156,7 +156,11 @@ class Extraction(BaseModel):
         "about, in a few words. Null otherwise."
     )
     secondary_topics: list[Domain] = Field(
-        description=f"Up to {MAX_SECONDARY_TOPICS} further domains. May be empty."
+        # max_length so the limit reaches the provider as `maxItems`. Keeping it
+        # only in the validator below meant the model never saw the rule and
+        # three of the first 25 extractions were rejected for breaking it.
+        max_length=MAX_SECONDARY_TOPICS,
+        description=f"Up to {MAX_SECONDARY_TOPICS} further domains. May be empty.",
     )
 
     instrument: Instrument

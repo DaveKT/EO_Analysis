@@ -38,6 +38,7 @@ class Settings:
     raw_dir: Path
     model: str
     concurrency: int
+    max_tokens: int
     openrouter_api_key: str | None
     openrouter_base_url: str
 
@@ -61,6 +62,7 @@ def load_settings() -> Settings:
         raw_dir=_path("EO_RAW_DIR", "data/raw"),
         model=os.getenv("EO_MODEL", "openai/gpt-oss-120b"),
         concurrency=int(os.getenv("EO_CONCURRENCY", "8")),
+        max_tokens=int(os.getenv("EO_MAX_TOKENS", "8000")),
         openrouter_api_key=os.getenv(API_KEY_VAR) or None,
         openrouter_base_url=os.getenv(
             "EO_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
