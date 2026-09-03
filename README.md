@@ -51,7 +51,8 @@ returns, run commands as `PYTHONPATH=src .venv/bin/python -m eo.cli ...`.
 eo status     # configuration, row counts, ingest health
 eo fetch      # Phase 1: ingest from the Federal Register (free, no model calls)
 eo extract    # Phase 3: the LLM pass
-eo validate   # Phase 4: quality gates                     (not yet implemented)
+eo validate   # Phase 4: quality gates
+eo review     # Phase 4: what the gates parked for human review
 eo export     # Phase 5: CSV/Parquet                       (not yet implemented)
 ```
 
@@ -65,8 +66,22 @@ instead of reconstructing what FR already states.
 ## The extraction contract
 
 Each order is described on two axes: `primary_topic` (13 domains — what the
-order is about) and `instrument` (6 kinds — what it does), kept as separate
-fields alongside `significance`. The second axis
+order is about) and `instrument` (6 kinds — what it does).
+
+`instrument` is decided by an explicit **precedence rule** rather than by
+judgment about emphasis, because "the action the order is mostly devoted to"
+is not reproducible: two careful readers split on EO 13985, which both
+establishes a working group and directs government-wide equity assessments.
+The rule takes the first that matches — creates a body, imposes sanctions,
+revokes or amends, delegates authority, directs a report, adjusts pay or
+administration — and is applied to what the text says, not to what seems most
+important.
+
+A `significance` field was **removed**. Asked to rate 25 orders, the model
+returned 19 `major`, 6 `substantive` and no `routine` — including a
+one-sentence order raising a council's membership from 25 to 30 — and agreed
+with hand labels 0% of the time. Alone among the fields it had no textual
+referent, so it could not be checked against the source. The second axis
 exists because this corpus is not shaped like a generic policy taxonomy:
 roughly 200 of 1,534 orders establish councils or task forces, 78 block
 property, and 49 set agency succession.
@@ -104,6 +119,36 @@ Two layers, deliberately separated:
 `source_quote` is mandatory on every extracted claim. Validation checks the
 quote actually appears in `body_text`. This is the anti-hallucination mechanism,
 not documentation.
+
+Models sometimes quote a span correctly and then drift in its final words. Such
+a quote is **trimmed to the part that is verifiably in the document**, the
+model's original is kept in `raw_quote`, and `quote_trimmed` marks the row. The
+groundedness gate scores `raw_quote` — what the model actually wrote — so the
+metric measures the model and not the repair. A separate invariant asserts that
+every stored quote appears in its source, which is 100% by construction; a
+failure there means the write path is broken.
+
+## Quality gates
+
+Gates run at the end of every extraction, and a run that fails them exits
+non-zero.
+
+| Gate | Target |
+|---|---|
+| groundedness (as the model wrote it) | ≥ 95% |
+| stored quotes verified | 100% |
+| null rate | ≤ 2% |
+| truncation | 0 |
+| `other` rate, either axis | ≤ 3% |
+| gold: primary_topic | ≥ 80% |
+| gold: instrument | ≥ 75% |
+| relationship agreement vs FR | advisory, to review queue |
+
+The gold set is [gold/gold_set.json](gold/gold_set.json): 20 orders hand-read
+from source, spanning all six presidencies, including the shortest order in the
+corpus and the longest in the sample. It is the only gate that can catch a model
+that is fluent and confidently wrong about what an order *is*; groundedness
+proves quotes are real, not that the reading is right.
 
 ## What went wrong in v1, and what prevents it now
 

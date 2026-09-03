@@ -1,0 +1,134 @@
+{
+  "version": "1",
+  "created": "2026-09-03",
+  "labelled_by": "hand-read from the source text of each order, not model output",
+  "convention": [
+    "primary_topic is the subject domain the order operates in. For an order whose main act is amending or extending an earlier body, the topic is that body's domain, not 'government_administration'.",
+    "instrument is decided by precedence, not by emphasis: (1) establishes a new body -> creates_body; (2) blocks property or restricts trade -> imposes_sanctions; (3) mainly revokes/amends/terminates -> revokes_or_amends; (4) assigns powers to an official -> delegates_authority; (5) requires a report or study -> directs_report_or_study; (6) pay, succession or internal admin -> adjusts_pay_or_admin. Take the first that matches.",
+    "A significance field was dropped on 2026-09-03: the model rated 19 of 25 orders 'major' and none 'routine', agreeing with these labels 0% of the time, and unlike every other field it had no textual referent to check against."
+  ],
+  "selection": "Every fifth order of the 100-order spread sample, so a 100-order run overlaps it fully. Spans all six presidencies, and includes both the shortest order in the corpus (EO 12890, 760 chars) and the longest in the sample (EO 14081, 54,068 chars).",
+  "labels": [
+    {
+      "eo_number": 12890,
+      "primary_topic": "technology_and_research",
+      "instrument": "revokes_or_amends",
+      "note": "Raises Advisory Council on the National Information Infrastructure membership from 25 to 30. Nothing else."
+    },
+    {
+      "eo_number": 12965,
+      "primary_topic": "energy_and_environment",
+      "instrument": "revokes_or_amends",
+      "note": "Extends the President's Council on Sustainable Development by amending EO 12852."
+    },
+    {
+      "eo_number": 13040,
+      "primary_topic": "health",
+      "instrument": "revokes_or_amends",
+      "note": "Expands membership of the Advisory Commission on Consumer Protection and Quality in the Health Care Industry."
+    },
+    {
+      "eo_number": 13115,
+      "primary_topic": "security_and_defense",
+      "instrument": "creates_body",
+      "note": "Establishes the Interagency Task Force on the Roles and Missions of the Coast Guard."
+    },
+    {
+      "eo_number": 13198,
+      "primary_topic": "government_administration",
+      "instrument": "creates_body",
+      "note": "Creates faith-based and community initiative centers inside five departments and sets their reporting duties."
+    },
+    {
+      "eo_number": 13268,
+      "primary_topic": "foreign_policy",
+      "instrument": "revokes_or_amends",
+      "note": "Terminates the Taliban national emergency and amends EO 13224. The operative act is termination and amendment."
+    },
+    {
+      "eo_number": 13338,
+      "primary_topic": "foreign_policy",
+      "instrument": "imposes_sanctions",
+      "note": "Blocks property of certain persons and bans exports to Syria under IEEPA and the Syria Accountability Act."
+    },
+    {
+      "eo_number": 13489,
+      "primary_topic": "government_administration",
+      "instrument": "delegates_authority",
+      "note": "Sets procedure for executive privilege claims over Presidential records, assigning roles to the Counsel to the President and the Attorney General. Establishes no entity, and the revocation of EO 13233 is a closing section rather than the purpose, so delegates_authority by rule 4."
+    },
+    {
+      "eo_number": 13554,
+      "primary_topic": "energy_and_environment",
+      "instrument": "creates_body",
+      "note": "Establishes the Gulf Coast Ecosystem Restoration Task Force."
+    },
+    {
+      "eo_number": 13619,
+      "primary_topic": "foreign_policy",
+      "instrument": "imposes_sanctions",
+      "note": "Blocks property of persons threatening the peace and stability of Burma."
+    },
+    {
+      "eo_number": 13684,
+      "primary_topic": "justice_and_law_enforcement",
+      "instrument": "creates_body",
+      "note": "Establishes the President's Task Force on 21st Century Policing."
+    },
+    {
+      "eo_number": 13765,
+      "primary_topic": "health",
+      "instrument": "delegates_authority",
+      "note": "Directs agencies to waive, defer or delay ACA provisions to the maximum extent permitted by law, pending repeal."
+    },
+    {
+      "eo_number": 13885,
+      "primary_topic": "technology_and_research",
+      "instrument": "creates_body",
+      "note": "Establishes the National Quantum Initiative Advisory Committee under the National Quantum Initiative Act."
+    },
+    {
+      "eo_number": 13985,
+      "primary_topic": "civil_rights",
+      "instrument": "creates_body",
+      "note": "Establishes the Interagency Working Group on Equitable Data and directs government-wide equity assessments. creates_body by precedence rule 1; previously labelled directs_report_or_study, which was a judgment call rather than a test against the text."
+    },
+    {
+      "eo_number": 14025,
+      "primary_topic": "labor_and_workforce",
+      "instrument": "creates_body",
+      "note": "Establishes the Task Force on Worker Organizing and Empowerment."
+    },
+    {
+      "eo_number": 14065,
+      "primary_topic": "foreign_policy",
+      "instrument": "imposes_sanctions",
+      "note": "Blocks property and prohibits transactions over Russian action against Ukraine's territorial integrity."
+    },
+    {
+      "eo_number": 14081,
+      "primary_topic": "technology_and_research",
+      "instrument": "directs_report_or_study",
+      "note": "Whole-of-government biotechnology and biomanufacturing initiative; the operative sections are agency directives and reports. Longest order in the sample at 54,068 chars."
+    },
+    {
+      "eo_number": 14105,
+      "primary_topic": "economy_and_finance",
+      "instrument": "imposes_sanctions",
+      "note": "Restricts US outbound investment in national security technologies in countries of concern; prohibits some transactions and makes others notifiable."
+    },
+    {
+      "eo_number": 14167,
+      "primary_topic": "security_and_defense",
+      "instrument": "delegates_authority",
+      "note": "Directs the Department of Defense to take a role in securing the southern border."
+    },
+    {
+      "eo_number": 14287,
+      "primary_topic": "immigration",
+      "instrument": "delegates_authority",
+      "note": "Directs the Attorney General and Secretary of Homeland Security to designate sanctuary jurisdictions and pursue consequences."
+    }
+  ],
+  "revision": "2026-09-03: adopted the instrument precedence rule. EO 13985 relabelled directs_report_or_study -> creates_body, because it states 'There is hereby established an Interagency Working Group on Equitable Data' and rule 1 outranks the equity assessments it also directs. EO 14081 was checked under the same rule and keeps directs_report_or_study: it establishes no entity, so the model's creates_body was wrong."
+}

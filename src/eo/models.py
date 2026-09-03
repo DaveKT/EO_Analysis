@@ -19,6 +19,13 @@ orders are education-related and had no home among the original 12.
 Both axes admit `other`, which requires a written reason. That is deliberate:
 a forced choice would make a vocabulary gap indistinguishable from a good fit,
 and Phase 4 fails any run where `other` exceeds 3%.
+
+A `significance` field was removed on 2026-09-03. Asked to rate 25 orders, the
+model returned 19 `major`, 6 `substantive` and no `routine` -- including a
+one-sentence order changing a council's membership from 25 to 30. It agreed
+with hand labels 0% of the time. Unlike every other field here it had no
+textual referent, so it could not be checked against the source: it was the
+"vibes" category the v1 post-mortem blamed for unfalsifiable output.
 """
 
 from __future__ import annotations
@@ -51,8 +58,16 @@ class Domain(str, Enum):
 
 
 class Instrument(str, Enum):
-    """What the order does. The order's *primary* action; secondary actions
-    belong in the summary."""
+    """What the order does.
+
+    Exactly one per order. When an order does several things, the precedence
+    rule in the prompt decides: establishing a new entity outranks everything
+    else, then sanctions, then revoking/amending, then delegation, then
+    reports, then pay and administration. The rule exists because "the action
+    the order is mostly devoted to" is not reproducible -- two careful readers
+    split on EO 13985, which both creates a working group and directs
+    government-wide equity assessments.
+    """
 
     CREATES_BODY = "creates_body"
     DELEGATES_AUTHORITY = "delegates_authority"
@@ -61,12 +76,6 @@ class Instrument(str, Enum):
     DIRECTS_REPORT_OR_STUDY = "directs_report_or_study"
     ADJUSTS_PAY_OR_ADMIN = "adjusts_pay_or_admin"
     OTHER = "other"
-
-
-class Significance(str, Enum):
-    ROUTINE = "routine"
-    SUBSTANTIVE = "substantive"
-    MAJOR = "major"
 
 
 class RelationKind(str, Enum):
@@ -169,12 +178,6 @@ class Extraction(BaseModel):
         "in a few words. Null otherwise."
     )
 
-    significance: Significance = Field(
-        description="'routine' for pay adjustments, succession, and committee "
-        "housekeeping; 'substantive' for real policy change; 'major' for orders "
-        "of broad national consequence."
-    )
-
     agencies_tasked: list[AgencyTask]
     deadlines: list[Deadline]
     authorities: list[Authority]
@@ -192,12 +195,25 @@ class Extraction(BaseModel):
 
     @model_validator(mode="after")
     def _secondary_topics_are_distinct(self) -> Extraction:
+        """Normalise rather than reject.
+
+        A duplicate, or the primary topic repeated in the secondary list, is
+        redundancy and not a contradiction -- the topic is already recorded. An
+        earlier version raised here, which threw away an otherwise sound
+        extraction of EO 13489 over a repeated value the model was never told
+        to avoid. Constraints the model cannot see belong in the schema; this
+        one is simply cleaned up.
+        """
         if len(self.secondary_topics) > MAX_SECONDARY_TOPICS:
             raise ValueError(f"at most {MAX_SECONDARY_TOPICS} secondary topics")
-        if len(set(self.secondary_topics)) != len(self.secondary_topics):
-            raise ValueError("secondary_topics contains duplicates")
-        if self.primary_topic in self.secondary_topics:
-            raise ValueError("primary_topic repeated in secondary_topics")
+
+        seen: set[Domain] = {self.primary_topic}
+        deduped: list[Domain] = []
+        for topic in self.secondary_topics:
+            if topic not in seen:
+                seen.add(topic)
+                deduped.append(topic)
+        object.__setattr__(self, "secondary_topics", deduped)
         return self
 
 

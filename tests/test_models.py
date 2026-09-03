@@ -92,10 +92,23 @@ def test_other_instrument_requires_a_reason() -> None:
         Extraction.model_validate(data)
 
 
-def test_primary_topic_may_not_repeat_in_secondary_topics() -> None:
+def test_repeated_topic_is_normalised_away_not_rejected() -> None:
+    """Redundancy is not a contradiction. Rejecting it threw away an otherwise
+    sound extraction over a rule the model was never given."""
     _, data = load_fixture(FIXTURES / "extractions" / "eo_13636.json")
-    data["secondary_topics"] = [data["primary_topic"]]
-    with pytest.raises(ValidationError, match="repeated"):
+    primary = data["primary_topic"]
+    data["secondary_topics"] = [primary, "health", "health"]
+
+    extraction = Extraction.model_validate(data)
+
+    assert extraction.primary_topic.value == primary
+    assert [t.value for t in extraction.secondary_topics] == ["health"]
+
+
+def test_too_many_secondary_topics_is_still_rejected() -> None:
+    _, data = load_fixture(FIXTURES / "extractions" / "eo_13636.json")
+    data["secondary_topics"] = ["health", "trade", "immigration", "civil_rights"]
+    with pytest.raises(ValidationError, match="at most"):
         Extraction.model_validate(data)
 
 

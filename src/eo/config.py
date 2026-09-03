@@ -39,6 +39,7 @@ class Settings:
     model: str
     concurrency: int
     max_tokens: int
+    request_timeout: float
     openrouter_api_key: str | None
     openrouter_base_url: str
 
@@ -63,6 +64,7 @@ def load_settings() -> Settings:
         model=os.getenv("EO_MODEL", "openai/gpt-oss-120b"),
         concurrency=int(os.getenv("EO_CONCURRENCY", "8")),
         max_tokens=int(os.getenv("EO_MAX_TOKENS", "8000")),
+        request_timeout=float(os.getenv("EO_REQUEST_TIMEOUT", "120")),
         openrouter_api_key=os.getenv(API_KEY_VAR) or None,
         openrouter_base_url=os.getenv(
             "EO_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"

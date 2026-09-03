@@ -36,7 +36,12 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "target_type": "TEXT",
         "target_label": "TEXT",
         "in_part": "INTEGER DEFAULT 0",
+        "raw_quote": "TEXT",
+        "quote_trimmed": "INTEGER DEFAULT 0",
     },
+    "agencies_tasked": {"raw_quote": "TEXT", "quote_trimmed": "INTEGER DEFAULT 0"},
+    "deadlines": {"raw_quote": "TEXT", "quote_trimmed": "INTEGER DEFAULT 0"},
+    "authorities": {"raw_quote": "TEXT", "quote_trimmed": "INTEGER DEFAULT 0"},
 }
 
 
@@ -86,6 +91,7 @@ TABLES = (
     "deadlines",
     "authorities",
     "relationships",
+    "review_queue",
 )
 
 

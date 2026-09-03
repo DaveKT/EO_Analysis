@@ -20,10 +20,15 @@ import unicodedata
 _HYPHEN_BREAK_RE = re.compile(r"-\s*\n\s*")
 _WHITESPACE_RE = re.compile(r"\s+")
 _ELLIPSIS_RE = re.compile(r"\s*(?:\.\.\.+|…)\s*")
+_ELLIPSIS_EDGE_RE = re.compile(r"^\s*(?:\.\.\.+|…)\s*|\s*(?:\.\.\.+|…)\s*$")
 
 # Shortest fragment of an elided quote worth checking. Below this a fragment
 # carries too little signal to confirm anything.
 MIN_FRAGMENT_CHARS = 12
+
+# A trimmed quote shorter than this carries too little context to be evidence
+# of anything; the claim goes to review instead.
+MIN_TRIMMED_WORDS = 6
 
 
 def _fold_typography(text: str) -> str:
@@ -77,7 +82,11 @@ def is_grounded(quote: str, body: str) -> bool:
         return False
 
     normalized_body = normalize(body)
-    normalized_quote = normalize(quote)
+    # A leading or trailing ellipsis asserts nothing about the text -- it only
+    # marks that the quote starts or stops mid-passage -- so it is removed
+    # before matching. Models emit it even when told not to, and it accounted
+    # for most remaining groundedness failures on the v2 run.
+    normalized_quote = _ELLIPSIS_EDGE_RE.sub("", normalize(quote)).strip()
 
     if _contains(normalized_quote, normalized_body):
         return True
@@ -97,3 +106,38 @@ def is_grounded(quote: str, body: str) -> bool:
             return False
         position = index + len(fragment)
     return True
+
+
+def longest_grounded_span(quote: str, body: str) -> str | None:
+    """The longest leading run of `quote`'s words that appears in `body`.
+
+    Models quote a span correctly and then drift, usually in the last words of
+    a long quote. Trimming to the part that is verifiably in the document keeps
+    a checkable citation instead of discarding the claim -- but only the caller
+    recording `quote_trimmed` makes that honest rather than a way of laundering
+    a bad quote into a good one.
+
+    Returns None if not even a usable opening fragment can be found.
+    """
+    if is_grounded(quote, body):
+        return quote
+
+    normalized_body = normalize(body)
+    # Matched on the normalized form, but sliced from the original, so the
+    # stored quote keeps the document's capitalisation and punctuation.
+    original_words = _ELLIPSIS_EDGE_RE.sub("", quote).split()
+    normalized_words = _ELLIPSIS_EDGE_RE.sub("", normalize(quote)).strip().split()
+    if len(original_words) != len(normalized_words):
+        original_words = normalized_words
+
+    low, high = 0, len(normalized_words)
+    while low < high:
+        mid = (low + high + 1) // 2
+        if _contains(" ".join(normalized_words[:mid]), normalized_body):
+            low = mid
+        else:
+            high = mid - 1
+
+    if low < MIN_TRIMMED_WORDS:
+        return None
+    return " ".join(original_words[:low])

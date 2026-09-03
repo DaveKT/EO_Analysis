@@ -4,10 +4,12 @@
   "summary": "Directs the federal government to improve the cybersecurity of critical infrastructure through expanded information sharing with private owners and operators and a voluntary Cybersecurity Framework developed by NIST. It sets a sequence of deadlines for instructions, procedures, and reports across DHS, DOJ, DNI, Defense, and Commerce.",
   "primary_topic": "technology_and_research",
   "topic_other_reason": null,
-  "secondary_topics": ["security_and_defense", "economy_and_finance"],
+  "secondary_topics": [
+    "security_and_defense",
+    "economy_and_finance"
+  ],
   "instrument": "directs_report_or_study",
   "instrument_other_reason": null,
-  "significance": "major",
   "agencies_tasked": [
     {
       "agency_name": "Attorney General, Secretary of Homeland Security, and Director of National Intelligence",

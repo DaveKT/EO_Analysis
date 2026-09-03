@@ -61,6 +61,25 @@ def test_elided_quote_is_checked_fragment_by_fragment() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "The Secretary of Education shall, in consultation ...",
+        "... in consultation with the other Co-Chairs of the Initiative",
+        "… the Co-Chairs shall submit a report to the President",
+    ],
+)
+def test_edge_ellipsis_is_stripped(quote: str) -> None:
+    """A leading or trailing ellipsis marks where the quote starts or stops.
+    It asserts nothing about the text, so it must not cause a failure -- it was
+    the single largest cause of false failures on the v2 run."""
+    assert grounding.is_grounded(quote, BODY)
+
+
+def test_edge_ellipsis_does_not_excuse_absent_text() -> None:
+    assert not grounding.is_grounded("the Secretary shall invoke the Act ...", BODY)
+
+
 def test_elided_fragments_must_appear_in_order() -> None:
     """Ellipsis means 'text omitted', not 'reassembled in a new order'."""
     assert not grounding.is_grounded(

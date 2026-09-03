@@ -4,10 +4,11 @@
   "summary": "Amends section 1(a) of Executive Order 12864 to raise the maximum membership of the United States Advisory Council on the National Information Infrastructure from 25 to 30. It makes no other change to the Council's mandate or operation.",
   "primary_topic": "government_administration",
   "topic_other_reason": null,
-  "secondary_topics": ["technology_and_research"],
+  "secondary_topics": [
+    "technology_and_research"
+  ],
   "instrument": "revokes_or_amends",
   "instrument_other_reason": null,
-  "significance": "routine",
   "agencies_tasked": [],
   "deadlines": [],
   "authorities": [

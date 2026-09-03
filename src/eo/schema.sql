@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS extractions (
   secondary_topics TEXT,                -- JSON array
   instrument       TEXT,
   instrument_other_reason TEXT,
-  significance     TEXT,                -- 'routine' | 'substantive' | 'major'
   finish_reason    TEXT,                -- 'length' means truncated -> invalid
   raw_response     TEXT,                -- kept for debugging
   PRIMARY KEY (document_number, run_id)
@@ -70,7 +69,9 @@ CREATE TABLE IF NOT EXISTS agencies_tasked (
   run_id          INTEGER NOT NULL REFERENCES extraction_runs (run_id),
   agency_name     TEXT NOT NULL,
   task            TEXT,
-  source_quote    TEXT NOT NULL
+  source_quote    TEXT NOT NULL,       -- verified to appear in body_text
+  raw_quote       TEXT,                -- what the model said, when it differs
+  quote_trimmed   INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS deadlines (
@@ -79,14 +80,18 @@ CREATE TABLE IF NOT EXISTS deadlines (
   due_description   TEXT,
   due_date          DATE,
   responsible_party TEXT,
-  source_quote      TEXT NOT NULL
+  source_quote      TEXT NOT NULL,
+  raw_quote         TEXT,
+  quote_trimmed     INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS authorities (
   document_number TEXT NOT NULL REFERENCES documents (document_number),
   run_id          INTEGER NOT NULL REFERENCES extraction_runs (run_id),
   authority       TEXT NOT NULL,        -- statute or constitutional clause invoked
-  source_quote    TEXT NOT NULL
+  source_quote    TEXT NOT NULL,
+  raw_quote       TEXT,
+  quote_trimmed   INTEGER DEFAULT 0
 );
 
 -- run_id is nullable: rows seeded from the Federal Register's disposition notes
@@ -105,7 +110,9 @@ CREATE TABLE IF NOT EXISTS relationships (
   target_label     TEXT,                -- as named in the source, e.g. 'Proc. 9704'
   in_part          INTEGER DEFAULT 0,   -- FR's "in part" qualifier
   source           TEXT NOT NULL,       -- 'fr_disposition_notes' | 'model'
-  source_quote     TEXT
+  source_quote     TEXT,
+  raw_quote        TEXT,
+  quote_trimmed    INTEGER DEFAULT 0
 );
 
 -- The uniqueness index that makes FR seeding idempotent is created in db.py,
@@ -143,3 +150,16 @@ WHERE d.eo_number IS NOT NULL
     ORDER BY d2.publication_date DESC, d2.body_char_count DESC
     LIMIT 1
   );
+
+-- Phase 4 review queue. Disagreements and ungrounded claims are parked here
+-- rather than written silently into the tables above, so a defect is visible
+-- as a defect instead of becoming data.
+CREATE TABLE IF NOT EXISTS review_queue (
+  run_id          INTEGER NOT NULL REFERENCES extraction_runs (run_id),
+  document_number TEXT NOT NULL REFERENCES documents (document_number),
+  kind            TEXT NOT NULL,   -- 'ungrounded_<table>' | 'relationship'
+  detail          TEXT,
+  created_at      TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_queue_run ON review_queue (run_id, kind);

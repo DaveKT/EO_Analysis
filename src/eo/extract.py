@@ -25,7 +25,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from eo import fr_client, prompts
+from eo import fr_client, grounding, prompts
 from eo.config import Settings
 from eo.models import Extraction, extraction_json_schema
 from eo.providers import Completion, OpenRouterClient
@@ -160,19 +160,37 @@ def finish_run(con: sqlite3.Connection, report: RunReport) -> None:
     con.commit()
 
 
+def _verified_quote(quote: str, body: str) -> tuple[str | None, str | None, int]:
+    """Return (stored_quote, raw_quote, trimmed_flag) for one claim.
+
+    A quote that drifts from the source is trimmed to the part that is
+    verifiably in the document, and the model's original is kept alongside it.
+    Nothing is silently improved: `quote_trimmed` marks every repaired row, and
+    the groundedness gate scores the original, so the metric still measures the
+    model rather than the repair.
+    """
+    if grounding.is_grounded(quote, body):
+        return quote, None, 0
+    trimmed = grounding.longest_grounded_span(quote, body)
+    if trimmed is None:
+        return None, quote, 1  # nothing verifiable; goes to review
+    return trimmed, quote, 1
+
+
 def persist(
     con: sqlite3.Connection,
     document_number: str,
     run_id: int,
     extraction: Extraction,
     completion: Completion,
+    body_text: str = "",
 ) -> None:
     """Write one extraction and its grounded claims. Committed immediately."""
     con.execute(
         "INSERT OR REPLACE INTO extractions (document_number, run_id, summary,"
         " primary_topic, topic_other_reason, secondary_topics, instrument,"
-        " instrument_other_reason, significance, finish_reason, raw_response)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " instrument_other_reason, finish_reason, raw_response)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             document_number,
             run_id,
@@ -182,7 +200,6 @@ def persist(
             json.dumps([t.value for t in extraction.secondary_topics]),
             extraction.instrument.value,
             extraction.instrument_other_reason,
-            extraction.significance.value,
             completion.finish_reason,
             completion.content,
         ),
@@ -197,17 +214,22 @@ def persist(
         (document_number, run_id),
     )
 
+    def verified(quote: str) -> tuple[str | None, str | None, int]:
+        return _verified_quote(quote, body_text) if body_text else (quote, None, 0)
+
     con.executemany(
         "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
-        " source_quote) VALUES (?, ?, ?, ?, ?)",
+        " source_quote, raw_quote, quote_trimmed) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
-            (document_number, run_id, a.agency_name, a.task, a.source_quote)
+            (document_number, run_id, a.agency_name, a.task, *verified(a.source_quote))
             for a in extraction.agencies_tasked
+            if verified(a.source_quote)[0] is not None
         ],
     )
     con.executemany(
         "INSERT INTO deadlines (document_number, run_id, due_description, due_date,"
-        " responsible_party, source_quote) VALUES (?, ?, ?, ?, ?, ?)",
+        " responsible_party, source_quote, raw_quote, quote_trimmed)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 document_number,
@@ -215,23 +237,26 @@ def persist(
                 d.due_description,
                 d.due_date,
                 d.responsible_party,
-                d.source_quote,
+                *verified(d.source_quote),
             )
             for d in extraction.deadlines
+            if verified(d.source_quote)[0] is not None
         ],
     )
     con.executemany(
-        "INSERT INTO authorities (document_number, run_id, authority, source_quote)"
-        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO authorities (document_number, run_id, authority, source_quote,"
+        " raw_quote, quote_trimmed) VALUES (?, ?, ?, ?, ?, ?)",
         [
-            (document_number, run_id, a.authority, a.source_quote)
+            (document_number, run_id, a.authority, *verified(a.source_quote))
             for a in extraction.authorities
+            if verified(a.source_quote)[0] is not None
         ],
     )
     con.executemany(
         "INSERT INTO relationships (document_number, run_id, relation,"
-        " target_eo_number, target_type, target_label, in_part, source, source_quote)"
-        " VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
+        " target_eo_number, target_type, target_label, in_part, source,"
+        " source_quote, raw_quote, quote_trimmed)"
+        " VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
         [
             (
                 document_number,
@@ -241,9 +266,10 @@ def persist(
                 "executive_order" if r.target_eo_number else None,
                 r.target_label,
                 MODEL_SOURCE,
-                r.source_quote,
+                *verified(r.source_quote),
             )
             for r in extraction.relationships
+            if verified(r.source_quote)[0] is not None
         ],
     )
     con.commit()
@@ -297,7 +323,11 @@ async def extract_all(
 ) -> RunReport:
     report = RunReport(run_id=run_id)
     schema = extraction_json_schema()
-    client = OpenRouterClient(settings.require_api_key(), settings.openrouter_base_url)
+    client = OpenRouterClient(
+        settings.require_api_key(),
+        settings.openrouter_base_url,
+        timeout=settings.request_timeout,
+    )
     semaphore = asyncio.Semaphore(settings.concurrency)
 
     # Relations are read up front: SQLite reads during the async gather would
@@ -352,7 +382,10 @@ async def extract_all(
                         report.failed.append((doc_num, f"schema: {exc}"[:200]))
                         status = "invalid"
                     else:
-                        persist(con, doc_num, run_id, extraction, outcome)
+                        persist(
+                            con, doc_num, run_id, extraction, outcome,
+                            body_text=document.get("body_text") or "",
+                        )
                         report.succeeded += 1
                         status = "ok"
 

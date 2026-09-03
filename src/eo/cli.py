@@ -14,6 +14,7 @@ import typer
 
 from eo import __version__, db, dispositions, ingest, prompts
 from eo import extract as extract_mod
+from eo import validate as validate_mod
 from eo.config import API_KEY_VAR, Settings, load_settings
 
 app = typer.Typer(
@@ -270,8 +271,15 @@ def extract(
         report.skipped_short = len(too_short)
         extract_mod.finish_run(con, report)
 
+    with db.session(settings.db_path) as con:
+        gates = validate_mod.validate_run(con, active_run)
+
     typer.echo("")
     typer.echo(report.summary())
+    _report_gates(gates)
+    if not gates.passed:
+        typer.secho("\nrun FAILED its quality gates.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
     if report.failed:
         typer.secho(f"\n{len(report.failed)} failure(s):", fg=typer.colors.RED, err=True)
         for doc_num, reason in report.failed[:20]:
@@ -279,10 +287,79 @@ def extract(
         raise typer.Exit(code=1)
 
 
+def _report_gates(report: validate_mod.ValidationReport) -> None:
+    typer.echo("")
+    typer.echo(f"quality gates for run {report.run_id}:")
+    for gate in report.gates:
+        if gate.advisory:
+            colour = typer.colors.BLUE
+        else:
+            colour = typer.colors.GREEN if gate.passed else typer.colors.RED
+        typer.secho("  " + gate.line(), fg=colour)
+        if gate.detail:
+            typer.echo(f"       {gate.detail}")
+    if report.review_items:
+        typer.echo("")
+        typer.echo(
+            f"{report.review_items} item(s) in the review queue"
+            f" — `eo review --run-id {report.run_id}`"
+        )
+
+
 @app.command()
-def validate() -> None:
+def validate(
+    run_id: int = typer.Option(..., "--run-id", help="Run to score."),
+) -> None:
     """Run the quality gates over an extraction run."""
-    _not_yet("validate", "Phase 4")
+    settings = load_settings()
+    with db.session(settings.db_path) as con:
+        if not con.execute(
+            "SELECT 1 FROM extraction_runs WHERE run_id = ?", (run_id,)
+        ).fetchone():
+            typer.secho(f"no such run: {run_id}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
+        report = validate_mod.validate_run(con, run_id)
+
+    _report_gates(report)
+    if not report.passed:
+        typer.secho("\nrun FAILED its quality gates.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    typer.secho("\nall gates passed.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def review(
+    run_id: int = typer.Option(..., "--run-id", help="Run to inspect."),
+    kind: str = typer.Option(None, "--kind", help="Filter by kind."),
+    limit: int = typer.Option(30, "--limit", "-n"),
+) -> None:
+    """Show what the gates parked for human review."""
+    settings = load_settings()
+    sql = "SELECT * FROM review_queue WHERE run_id = ?"
+    params: list = [run_id]
+    if kind:
+        sql += " AND kind LIKE ?"
+        params.append(f"%{kind}%")
+    sql += " ORDER BY kind, document_number LIMIT ?"
+    params.append(limit)
+
+    with db.session(settings.db_path) as con:
+        rows = con.execute(sql, params).fetchall()
+        counts = con.execute(
+            "SELECT kind, COUNT(*) n FROM review_queue WHERE run_id = ?"
+            " GROUP BY kind ORDER BY n DESC",
+            (run_id,),
+        ).fetchall()
+
+    if not rows:
+        typer.echo("review queue is empty.")
+        return
+    for row in counts:
+        typer.echo(f"  {row['n']:>4}  {row['kind']}")
+    typer.echo("")
+    for row in rows:
+        typer.echo(f"[{row['kind']}] {row['document_number']}")
+        typer.echo(f"   {row['detail']}")
 
 
 @app.command()
