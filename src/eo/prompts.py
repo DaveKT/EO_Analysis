@@ -5,6 +5,18 @@ change here produces a new, comparable run rather than silently altering what
 past results mean. Bump it whenever the wording below changes in a way that
 could change output.
 
+v6 -> v7: v6 added `tribal_affairs` and `confers_status_or_honor` to the
+vocabulary AND described them at length in the prompt. It regressed everything:
+topic agreement 80% -> 75%, instrument 90% -> 80%, `other` 7% -> 11%. Four
+orders classified correctly under v5 became `other` under v6 on identical text.
+The categories were not the problem; the prose was. Explaining at length what
+each category does not cover taught the model to check for exact coverage and
+reach for `other` when the fit was inexact.
+
+v7 is v5's text verbatim, plus one line placing the new instrument in the
+existing precedence list. The new enum values remain available -- the model
+sees them in the schema -- but nothing in the prompt argues about coverage.
+
 v4 -> v5: adds the topic disambiguation rule. On 100 orders, instrument
 agreement with hand labels reached 89% but topic sat at 53%, and a third of the
 gap was one pattern: the model filed body-creating orders under
@@ -38,7 +50,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PROMPT_VERSION = "v5"
+PROMPT_VERSION = "v7"
 
 SYSTEM_PROMPT = """\
 You extract structured facts from United States Executive Orders. You are \
@@ -88,11 +100,13 @@ records management, procurement, the internal conduct of agencies.
    2. it blocks property, or restricts trade or transactions -> `imposes_sanctions`
    3. its main purpose is to revoke, amend, extend or terminate an earlier
       order or emergency -> `revokes_or_amends`
-   4. it assigns powers, functions or discretion to an official or agency
+   4. it creates a medal, award, decoration or commemoration
+      -> `confers_status_or_honor`
+   5. it assigns powers, functions or discretion to an official or agency
       -> `delegates_authority`
-   5. it requires a report, study, assessment, plan or recommendation
+   6. it requires a report, study, assessment, plan or recommendation
       -> `directs_report_or_study`
-   6. it adjusts pay rates, sets an order of succession, or is otherwise
+   7. it adjusts pay rates, sets an order of succession, or is otherwise
       internal administration -> `adjusts_pay_or_admin`
 
    Apply the rule to what the text does, not to which part seems most

@@ -16,6 +16,13 @@ under vague buckets.
 `education` was added on 2026-09-03 after hand-labelling exposed the gap: 52
 orders are education-related and had no home among the original 12.
 
+`tribal_affairs` and `confers_status_or_honor` were added the same day, after
+the 100-order run put `other` at 7%: consultation with tribal governments
+recurs across every administration, and orders creating medals, awards and
+commemorations are a standing genre with no instrument to land on. Both were
+found by the `other` gate doing its job -- which is the argument for having
+kept the escape hatch instead of forcing a choice.
+
 Both axes admit `other`, which requires a written reason. That is deliberate:
 a forced choice would make a vocabulary gap indistinguishable from a good fit,
 and Phase 4 fails any run where `other` exceeds 3%.
@@ -54,6 +61,7 @@ class Domain(str, Enum):
     JUSTICE_AND_LAW_ENFORCEMENT = "justice_and_law_enforcement"
     TECHNOLOGY_AND_RESEARCH = "technology_and_research"
     EDUCATION = "education"
+    TRIBAL_AFFAIRS = "tribal_affairs"
     OTHER = "other"
 
 
@@ -75,6 +83,7 @@ class Instrument(str, Enum):
     REVOKES_OR_AMENDS = "revokes_or_amends"
     DIRECTS_REPORT_OR_STUDY = "directs_report_or_study"
     ADJUSTS_PAY_OR_ADMIN = "adjusts_pay_or_admin"
+    CONFERS_STATUS_OR_HONOR = "confers_status_or_honor"
     OTHER = "other"
 
 

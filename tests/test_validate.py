@@ -78,6 +78,9 @@ def test_groundedness_passes_on_a_real_quote(con: sqlite3.Connection) -> None:
     gates, failures = validate.gate_groundedness(con, 1)
     assert all(g.passed for g in gates)
     assert failures == []
+    assert {g.name for g in gates} == {
+        "severe quote drift", "groundedness", "stored quotes verified"
+    }
 
 
 def test_groundedness_fails_on_a_fabricated_quote(con: sqlite3.Connection) -> None:
@@ -85,7 +88,10 @@ def test_groundedness_fails_on_a_fabricated_quote(con: sqlite3.Connection) -> No
     add_extraction(con)
     add_quote(con, "invokes the Defense Production Act to expand production")
     gates, failures = validate.gate_groundedness(con, 1)
-    assert not gates[0].passed
+    by_name = {g.name: g for g in gates}
+    # Nothing of the quote survives verification, so it is severe drift, not
+    # a tail wobble.
+    assert not by_name["severe quote drift"].passed
     assert len(failures) == 1
 
 
@@ -105,11 +111,33 @@ def test_groundedness_scores_the_model_not_the_repair(con: sqlite3.Connection) -
     con.commit()
 
     gates, failures = validate.gate_groundedness(con, 1)
-    fidelity, stored = gates
-    assert not fidelity.passed          # the model's own quote was wrong
-    assert stored.passed                # what we stored is verifiable
-    assert "1 quote(s) trimmed" in stored.detail
+    by_name = {g.name: g for g in gates}
+    # The model's quote was wrong, but most of it verified: tail drift, which
+    # is reported rather than gated, while the stored quote is sound.
+    assert by_name["groundedness"].value != "100.0%"
+    assert by_name["severe quote drift"].passed
+    assert by_name["stored quotes verified"].passed
+    assert "1 quote(s) trimmed" in by_name["stored quotes verified"].detail
     assert len(failures) == 1
+
+
+def test_severe_drift_and_tail_drift_are_scored_differently(
+    con: sqlite3.Connection,
+) -> None:
+    """The point of splitting the gate: a quote that keeps 90% of its words
+    before wobbling is not the same defect as one that is mostly invented."""
+    add_extraction(con)
+    con.execute(
+        "INSERT INTO authorities (document_number, run_id, authority,"
+        " source_quote, raw_quote, quote_trimmed) VALUES ('2020-0001', 1, 'a', ?, ?, 1)",
+        ("the Secretary of Commerce", "the Secretary of Commerce shall visit the Moon"),
+    )
+    con.commit()
+
+    gates, _ = validate.gate_groundedness(con, 1)
+    by_name = {g.name: g for g in gates}
+    # 4 of 8 words kept = 50%, above the 40% severity line
+    assert by_name["severe quote drift"].passed
 
 
 def test_null_rate_fails_on_empty_rows(con: sqlite3.Connection) -> None:

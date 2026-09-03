@@ -155,5 +155,5 @@ def test_schema_is_strict_mode_compatible() -> None:
 def test_topic_and_instrument_vocabularies_are_closed() -> None:
     """The vocabularies are locked before the full run; changing them after
     invalidates cross-run comparison. This pins them."""
-    assert len(Domain) == 14  # 13 domains + other
-    assert len(Instrument) == 7  # 6 instruments + other
+    assert len(Domain) == 15  # 14 domains + other
+    assert len(Instrument) == 8  # 7 instruments + other

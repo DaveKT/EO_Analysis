@@ -214,8 +214,15 @@ def persist(
         (document_number, run_id),
     )
 
+    dropped: list[tuple[str, str]] = []
+
     def verified(quote: str) -> tuple[str | None, str | None, int]:
-        return _verified_quote(quote, body_text) if body_text else (quote, None, 0)
+        if not body_text:
+            return quote, None, 0
+        result = _verified_quote(quote, body_text)
+        if result[0] is None:
+            dropped.append(("dropped_unverifiable", quote[:300]))
+        return result
 
     con.executemany(
         "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
@@ -272,6 +279,21 @@ def persist(
             if verified(r.source_quote)[0] is not None
         ],
     )
+
+    # A claim whose quote yields nothing verifiable is not stored -- but it must
+    # not vanish either. Dropping it silently would be the exact failure this
+    # project exists to prevent: an absent row is indistinguishable from work
+    # never attempted.
+    if dropped:
+        con.executemany(
+            "INSERT INTO review_queue (run_id, document_number, kind, detail,"
+            " created_at) VALUES (?, ?, ?, ?, ?)",
+            [
+                (run_id, document_number, kind, detail,
+                 datetime.now(UTC).isoformat(timespec="seconds"))
+                for kind, detail in dict.fromkeys(dropped)
+            ],
+        )
     con.commit()
 
 
