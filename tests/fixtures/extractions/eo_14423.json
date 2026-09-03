@@ -1,0 +1,40 @@
+{
+  "_note": "Hand-written by a human reader of EO 14423, not model output.",
+  "_eo_number": 14423,
+  "summary": "Establishes the Presidential Commission on the United States Space Academy, chaired by the NASA Administrator, to advise the President on creating a NASA-led federal academy for the space workforce. The Commission must report within 120 days with recommendations on governance, curriculum, service obligations, admissions, and siting.",
+  "primary_topic": "education",
+  "topic_other_reason": null,
+  "secondary_topics": [
+    "security_and_defense"
+  ],
+  "instrument": "creates_body",
+  "instrument_other_reason": null,
+  "significance": "substantive",
+  "agencies_tasked": [
+    {
+      "agency_name": "Administrator of the National Aeronautics and Space Administration (NASA)",
+      "task": "Serve as Chair of the Presidential Commission on the United States Space Academy.",
+      "source_quote": "The Administrator of the National Aeronautics and Space Administration (NASA) shall serve as Chair of the Commission."
+    },
+    {
+      "agency_name": "Presidential Commission on the United States Space Academy",
+      "task": "Advise and assist the President on proposals to establish the Space Academy, and report with recommendations.",
+      "source_quote": "The Commission shall advise and assist the President regarding proposals to establish the United States Space Academy"
+    }
+  ],
+  "deadlines": [
+    {
+      "due_description": "within 120 days of the date of this order",
+      "due_date": "2026-12-26",
+      "responsible_party": "Presidential Commission on the United States Space Academy",
+      "source_quote": "Within 120 days of the date of this order, the Commission shall submit to the President through the APST and the APEP a report proposing key details for the establishment of the Space Academy."
+    }
+  ],
+  "authorities": [
+    {
+      "authority": "Constitution and the laws of the United States of America",
+      "source_quote": "By the authority vested in me as President by the Constitution and the laws of the United States of America, it is hereby ordered"
+    }
+  ],
+  "relationships": []
+}

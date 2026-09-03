@@ -1,0 +1,44 @@
+{
+  "_note": "Hand-written by a human reader of EO 13636, not model output.",
+  "_eo_number": 13636,
+  "summary": "Directs the federal government to improve the cybersecurity of critical infrastructure through expanded information sharing with private owners and operators and a voluntary Cybersecurity Framework developed by NIST. It sets a sequence of deadlines for instructions, procedures, and reports across DHS, DOJ, DNI, Defense, and Commerce.",
+  "primary_topic": "technology_and_research",
+  "topic_other_reason": null,
+  "secondary_topics": ["security_and_defense", "economy_and_finance"],
+  "instrument": "directs_report_or_study",
+  "instrument_other_reason": null,
+  "significance": "major",
+  "agencies_tasked": [
+    {
+      "agency_name": "Attorney General, Secretary of Homeland Security, and Director of National Intelligence",
+      "task": "Issue instructions for producing and disseminating unclassified reports of cyber threats to targeted U.S. entities.",
+      "source_quote": "Within 120 days of the date of this order, the Attorney General, the Secretary of Homeland Security (the ``Secretary''), and the Director of National Intelligence shall each issue instructions"
+    },
+    {
+      "agency_name": "Secretary of Homeland Security",
+      "task": "Identify critical infrastructure where a cybersecurity incident could have catastrophic effects.",
+      "source_quote": "the Secretary shall use a risk-based approach to identify critical infrastructure where a cybersecurity incident could reasonably result in catastrophic regional or national"
+    }
+  ],
+  "deadlines": [
+    {
+      "due_description": "within 120 days of the date of this order",
+      "due_date": "2013-06-12",
+      "responsible_party": "Attorney General, Secretary of Homeland Security, and Director of National Intelligence",
+      "source_quote": "Within 120 days of the date of this order, the Attorney General, the Secretary of Homeland Security (the ``Secretary''), and the Director of National Intelligence shall each issue instructions"
+    },
+    {
+      "due_description": "within 240 days of the date of this order",
+      "due_date": "2013-10-10",
+      "responsible_party": "Director of the National Institute of Standards and Technology",
+      "source_quote": "(e) Within 240 days of the date of this order, the Director shall publish a preliminary version of the Cybersecurity Framework (the ``preliminary Framework'')."
+    }
+  ],
+  "authorities": [
+    {
+      "authority": "Constitution and the laws of the United States of America",
+      "source_quote": "By the authority vested in me as President by the Constitution and the laws of the United States of America, it is hereby ordered as follows"
+    }
+  ],
+  "relationships": []
+}

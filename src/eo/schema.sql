@@ -48,8 +48,13 @@ CREATE TABLE IF NOT EXISTS extractions (
   document_number  TEXT NOT NULL REFERENCES documents (document_number),
   run_id           INTEGER NOT NULL REFERENCES extraction_runs (run_id),
   summary          TEXT,
-  primary_topic    TEXT,                -- controlled vocabulary; see models.py
+  -- Two axes; see models.py. primary_topic is what the order is about,
+  -- instrument is what it does. Both admit 'other', which requires a reason.
+  primary_topic    TEXT,
+  topic_other_reason TEXT,
   secondary_topics TEXT,                -- JSON array
+  instrument       TEXT,
+  instrument_other_reason TEXT,
   significance     TEXT,                -- 'routine' | 'substantive' | 'major'
   finish_reason    TEXT,                -- 'length' means truncated -> invalid
   raw_response     TEXT,                -- kept for debugging
@@ -84,14 +89,28 @@ CREATE TABLE IF NOT EXISTS authorities (
   source_quote    TEXT NOT NULL
 );
 
+-- run_id is nullable: rows seeded from the Federal Register's disposition notes
+-- exist before any extraction run and belong to no run.
+--
+-- Relation names encode direction. An order's own text can only assert what it
+-- does to earlier orders; "revoked_by" is knowledge from the future and comes
+-- only from FR notes. Outbound: revokes, amends, supersedes, continues,
+-- supplements, suspends, rescinds, references. Inbound: the same with _by.
 CREATE TABLE IF NOT EXISTS relationships (
   document_number  TEXT NOT NULL REFERENCES documents (document_number),
   run_id           INTEGER REFERENCES extraction_runs (run_id),
-  relation         TEXT NOT NULL,       -- revokes|amends|supersedes|continues|references
+  relation         TEXT NOT NULL,
   target_eo_number INTEGER,
+  target_type      TEXT,                -- executive_order|proclamation|notice|...
+  target_label     TEXT,                -- as named in the source, e.g. 'Proc. 9704'
+  in_part          INTEGER DEFAULT 0,   -- FR's "in part" qualifier
   source           TEXT NOT NULL,       -- 'fr_disposition_notes' | 'model'
   source_quote     TEXT
 );
+
+-- The uniqueness index that makes FR seeding idempotent is created in db.py,
+-- after the column migration -- it references columns that older databases
+-- acquire only in that step.
 
 CREATE INDEX IF NOT EXISTS idx_agencies_tasked_doc ON agencies_tasked (document_number, run_id);
 CREATE INDEX IF NOT EXISTS idx_deadlines_doc ON deadlines (document_number, run_id);

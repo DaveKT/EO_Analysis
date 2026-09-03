@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import typer
 
-from eo import __version__, db, ingest
+from eo import __version__, db, dispositions, ingest
 from eo.config import API_KEY_VAR, Settings, load_settings
 
 app = typer.Typer(
@@ -103,6 +103,12 @@ def status() -> None:
         "  [one canonical row per EO number]"
     )
 
+    if health["relationships"]:
+        typer.echo("")
+        typer.echo("relationships seeded from FR disposition notes:")
+        for relation, count in health["relationships"][:8]:
+            typer.echo(f"  {relation:<16} {count:>5}")
+
     typer.echo("")
     typer.echo("by president:")
     for row in health["by_president"]:
@@ -148,8 +154,18 @@ def fetch(
             on_progress=progress,
         )
 
+    # Seed relationships from the Federal Register's own cross-reference chain
+    # before any model runs, so extraction adds to a known-good base rather
+    # than reconstructing what FR already states.
+    with db.session(settings.db_path) as con:
+        seeded = dispositions.seed_relationships(con)
+
     typer.echo("")
     typer.echo(report.summary())
+    typer.echo(
+        f"FR relationships: {seeded['edges_inserted']} new edge(s) from "
+        f"{seeded['documents']} document(s) with disposition notes"
+    )
 
     if report.failures:
         typer.secho(

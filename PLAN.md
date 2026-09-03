@@ -294,8 +294,27 @@ Carry this table into the README. Every v1 failure has exactly one structural fi
 
 ## 8. Open items for the implementing session
 
-- Confirm the topic controlled vocabulary before Phase 2 — it is expensive to change after a
-  full run.
+- ~~Confirm the topic controlled vocabulary before Phase 2~~ **Decided 2026-09-03: two axes.**
+  `primary_topic` from 12 domains, plus a separate `instrument` from 6 values describing what
+  the order *does* (creates_body, delegates_authority, imposes_sanctions, revokes_or_amends,
+  directs_report_or_study, adjusts_pay_or_admin). Both accept `other` with a required free-text
+  reason, and Phase 4 fails the run if `other` exceeds 3% on either axis, so vocabulary gaps
+  surface instead of hiding.
+
+  Chosen over a single generic policy list because the corpus does not look like a generic
+  policy taxonomy: ~200 of 1,534 orders establish councils/commissions/task forces, 78 block
+  property, 49 set agency succession, ~42 adjust federal pay. Domain alone files all of those
+  under vague buckets; the second axis is what makes "how often does each president create a
+  commission vs. impose sanctions" answerable.
+
+  Implemented in schema.sql: `extractions` gained `instrument` and the two `*_other_reason`
+  columns. `instrument` and `significance` are kept as separate fields.
+- ~~The 12 domains have no `education` category~~ **Resolved 2026-09-03: `education` added as
+  the 13th domain.** Found while hand-labelling the Phase 2 fixtures: 52 orders are
+  education-related (the Educational Excellence series, Tribal Colleges, HBCUs, educational
+  technology, the Space Academy) and had no home. Caught before any tokens were spent.
+- ~~Decide whether `significance` survives alongside `instrument`~~ **Resolved 2026-09-03:
+  both are kept as separate fields.**
 - Pick the sweep model at Phase 3 (`gpt-oss-120b` is the default recommendation).
 - Decide whether proclamations and presidential memoranda eventually join the corpus. The
   schema supports it; scope currently says EOs only.

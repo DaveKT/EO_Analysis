@@ -24,9 +24,47 @@ def connect(db_path: Path, *, create_parents: bool = True) -> sqlite3.Connection
     return con
 
 
+# Columns added after the first databases were created. CREATE TABLE IF NOT
+# EXISTS will not add them to an existing table, so they are applied explicitly.
+_ADDED_COLUMNS: dict[str, dict[str, str]] = {
+    "extractions": {
+        "topic_other_reason": "TEXT",
+        "instrument": "TEXT",
+        "instrument_other_reason": "TEXT",
+    },
+    "relationships": {
+        "target_type": "TEXT",
+        "target_label": "TEXT",
+        "in_part": "INTEGER DEFAULT 0",
+    },
+}
+
+
+def _add_missing_columns(con: sqlite3.Connection) -> None:
+    for table, columns in _ADDED_COLUMNS.items():
+        present = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns.items():
+            if name not in present:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
+# Indexes over columns from _ADDED_COLUMNS: they must be created after those
+# columns exist, so they cannot live in schema.sql.
+_POST_MIGRATION = (
+    (
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_relationships_fr_unique"
+        " ON relationships (document_number, relation, target_label)"
+        " WHERE run_id IS NULL"
+    ),
+)
+
+
 def migrate(con: sqlite3.Connection) -> None:
-    """Apply schema.sql. Every statement is IF NOT EXISTS, so this is idempotent."""
+    """Apply schema.sql, then any columns added to existing tables. Idempotent."""
     con.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    _add_missing_columns(con)
+    for statement in _POST_MIGRATION:
+        con.execute(statement)
     con.commit()
 
 
@@ -74,6 +112,13 @@ def ingest_health(con: sqlite3.Connection) -> dict[str, object]:
         " WHERE disposition_notes IS NOT NULL AND disposition_notes != ''"
     ).fetchone()[0]
     extractable = con.execute("SELECT COUNT(*) FROM extractable_documents").fetchone()[0]
+    relationships = [
+        (row[0], row[1])
+        for row in con.execute(
+            "SELECT relation, COUNT(*) FROM relationships WHERE run_id IS NULL"
+            " GROUP BY relation ORDER BY COUNT(*) DESC"
+        )
+    ]
     by_president = con.execute(
         "SELECT president, COUNT(*) n, MIN(signing_date) lo, MAX(signing_date) hi"
         " FROM documents GROUP BY president ORDER BY lo"
@@ -87,5 +132,6 @@ def ingest_health(con: sqlite3.Connection) -> dict[str, object]:
         "missing_eo_number": missing_eo,
         "with_disposition_notes": with_notes,
         "extractable": extractable,
+        "relationships": relationships,
         "by_president": by_president,
     }

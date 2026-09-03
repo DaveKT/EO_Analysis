@@ -1,0 +1,27 @@
+{
+  "_note": "Hand-written by a human reader of EO 12890, not model output. Quotes are verbatim from body_text under whitespace normalization.",
+  "_eo_number": 12890,
+  "summary": "Amends section 1(a) of Executive Order 12864 to raise the maximum membership of the United States Advisory Council on the National Information Infrastructure from 25 to 30. It makes no other change to the Council's mandate or operation.",
+  "primary_topic": "government_administration",
+  "topic_other_reason": null,
+  "secondary_topics": ["technology_and_research"],
+  "instrument": "revokes_or_amends",
+  "instrument_other_reason": null,
+  "significance": "routine",
+  "agencies_tasked": [],
+  "deadlines": [],
+  "authorities": [
+    {
+      "authority": "Constitution and the laws of the United States of America",
+      "source_quote": "By the authority vested in me as President by the Constitution and the laws of the United States of America"
+    }
+  ],
+  "relationships": [
+    {
+      "relation": "amends",
+      "target_eo_number": 12864,
+      "target_label": "Executive Order No. 12864",
+      "source_quote": "section 1(a) of Executive Order No. 12864 is amended by deleting the number ``25'' and inserting the number ``30'' in lieu thereof"
+    }
+  ]
+}

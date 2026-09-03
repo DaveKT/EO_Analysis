@@ -57,7 +57,24 @@ eo export     # Phase 5: CSV/Parquet                       (not yet implemented)
 
 `eo fetch` is idempotent and resumable at two levels: documents already stored
 are skipped, and bodies already in `data/raw/` are reused without a network
-round trip. An interrupted run is resumed by running the command again.
+round trip. An interrupted run is resumed by running the command again. It also
+seeds `relationships` from the Federal Register's own disposition notes — about
+3,900 edges across 1,111 orders — so extraction adds to a known-good base
+instead of reconstructing what FR already states.
+
+## The extraction contract
+
+Each order is described on two axes: `primary_topic` (13 domains — what the
+order is about) and `instrument` (6 kinds — what it does), kept as separate
+fields alongside `significance`. The second axis
+exists because this corpus is not shaped like a generic policy taxonomy:
+roughly 200 of 1,534 orders establish councils or task forces, 78 block
+property, and 49 set agency succession.
+
+Both axes admit `other`, which requires a written reason, and Phase 4 fails any
+run where `other` exceeds 3%. A forced choice would make a vocabulary gap
+indistinguishable from a good fit — the class of silent failure this rebuild
+exists to prevent.
 
 ## Design
 
