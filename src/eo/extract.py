@@ -295,6 +295,15 @@ def record_failure(
     con.commit()
 
 
+def _parses(content: str) -> bool:
+    """Whether a response body satisfies the contract, without raising."""
+    try:
+        Extraction.model_validate_json(content)
+    except (ValidationError, ValueError):
+        return False
+    return True
+
+
 async def _call(
     client: OpenRouterClient,
     settings: Settings,
@@ -346,6 +355,15 @@ async def extract_all(
                     completion = await _call(
                         client, settings, document,
                         relations[document["document_number"]], schema, max_tokens * 2,
+                    )
+                elif not _parses(completion.content):
+                    # A malformed body -- truncated JSON, a bare array, or a
+                    # shape the provider invented -- is a bad response, not a
+                    # bad document. Six of 100 orders failed this way, each
+                    # recoverable by simply asking again.
+                    completion = await _call(
+                        client, settings, document,
+                        relations[document["document_number"]], schema, max_tokens,
                     )
                 return document, completion
             except Exception as exc:  # noqa: BLE001

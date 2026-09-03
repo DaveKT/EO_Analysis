@@ -183,15 +183,24 @@ class Extraction(BaseModel):
     authorities: list[Authority]
     relationships: list[ModelRelationship]
 
-    @model_validator(mode="after")
-    def _other_requires_a_reason(self) -> Extraction:
+    @property
+    def missing_other_reasons(self) -> list[str]:
+        """Axes answered `other` without the justification that was asked for.
+
+        This used to raise, which threw away the whole extraction -- twenty-odd
+        verified claims -- over a missing sentence. JSON Schema cannot express
+        "required only when the value is `other`", so the model never saw the
+        rule; a constraint it cannot see must not be enforced by discarding its
+        work. Phase 4 routes these to the review queue instead.
+        """
+        missing = []
         if self.primary_topic is Domain.OTHER and not (self.topic_other_reason or "").strip():
-            raise ValueError("primary_topic 'other' requires topic_other_reason")
+            missing.append("primary_topic")
         if self.instrument is Instrument.OTHER and not (
             self.instrument_other_reason or ""
         ).strip():
-            raise ValueError("instrument 'other' requires instrument_other_reason")
-        return self
+            missing.append("instrument")
+        return missing
 
     @model_validator(mode="after")
     def _secondary_topics_are_distinct(self) -> Extraction:

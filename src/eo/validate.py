@@ -161,6 +161,33 @@ def gate_truncation(con: sqlite3.Connection, run_id: int) -> Gate:
     )
 
 
+def missing_other_reasons(con: sqlite3.Connection, run_id: int) -> list[tuple]:
+    """Rows that answered `other` without saying why.
+
+    Not fatal -- the model was never shown this rule, because JSON Schema
+    cannot express it -- but an unexplained `other` is exactly what the review
+    queue is for: it is either a vocabulary gap or a lazy answer, and only a
+    human can tell which.
+    """
+    return [
+        (
+            row["document_number"],
+            "other_without_reason",
+            f"{row['axis']} = 'other' with no reason given",
+        )
+        for row in con.execute(
+            "SELECT document_number, 'primary_topic' AS axis FROM extractions"
+            " WHERE run_id = ? AND primary_topic = 'other'"
+            "   AND (topic_other_reason IS NULL OR TRIM(topic_other_reason) = '')"
+            " UNION ALL"
+            " SELECT document_number, 'instrument' AS axis FROM extractions"
+            " WHERE run_id = ? AND instrument = 'other'"
+            "   AND (instrument_other_reason IS NULL OR TRIM(instrument_other_reason) = '')",
+            (run_id, run_id),
+        )
+    ]
+
+
 def gate_other_rate(con: sqlite3.Connection, run_id: int) -> Gate:
     """`other` above this rate means the vocabulary has a gap, not that the
     orders are unusual. Education was found exactly this way."""
@@ -332,9 +359,11 @@ def validate_run(con: sqlite3.Connection, run_id: int) -> ValidationReport:
         *gate_gold_set(con, run_id, load_gold_set()),
     ]
 
-    review = [
-        (doc, f"ungrounded_{table}", quote) for doc, table, quote in ungrounded
-    ] + disagreements
+    review = (
+        [(doc, f"ungrounded_{table}", quote) for doc, table, quote in ungrounded]
+        + disagreements
+        + missing_other_reasons(con, run_id)
+    )
     record_review_items(con, run_id, review)
     report.review_items = len(review)
     return report

@@ -5,6 +5,14 @@ change here produces a new, comparable run rather than silently altering what
 past results mean. Bump it whenever the wording below changes in a way that
 could change output.
 
+v4 -> v5: adds the topic disambiguation rule. On 100 orders, instrument
+agreement with hand labels reached 89% but topic sat at 53%, and a third of the
+gap was one pattern: the model filed body-creating orders under
+`government_administration` (a Gulf Coast restoration task force, a policing
+commission, a quantum advisory committee), reasoning that creating a federal
+body is government administration. That is a reasonable reading of an
+instruction that never said otherwise. v5 says otherwise.
+
 v3 -> v4: adds the instrument precedence rule and removes `significance`.
 Instrument agreement against hand labels sat at 50%, and most of the gap was
 orders that both create a body and direct reports, where two careful readers
@@ -30,7 +38,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PROMPT_VERSION = "v4"
+PROMPT_VERSION = "v5"
 
 SYSTEM_PROMPT = """\
 You extract structured facts from United States Executive Orders. You are \
@@ -60,6 +68,17 @@ no judgment of whether the policy is good, urgent or aggressive.
 
 6. `primary_topic` is what the order is *about*. `instrument` is what it \
 *does*. Choose exactly one of each.
+
+   When an order establishes a body, the topic is that body's SUBJECT, not the \
+fact that a body was created. A task force on ecosystem restoration is \
+`energy_and_environment`; a commission on policing is \
+`justice_and_law_enforcement`; a quantum computing advisory committee is \
+`technology_and_research`. The same holds for an order that amends or extends \
+an earlier body: take the subject of the body being amended.
+
+   Use `government_administration` only when the subject really is the \
+machinery of government itself -- federal pay, orders of succession, \
+records management, procurement, the internal conduct of agencies.
 
 7. Most orders do several things. That is normal and is not a reason to answer \
 `other`. When several apply, take the FIRST that matches, in this order:

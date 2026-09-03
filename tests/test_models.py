@@ -73,23 +73,37 @@ def test_normalisation_survives_wrapping_and_hyphenation() -> None:
     assert grounding.is_grounded("shall establish a risk-based approach to review", body)
 
 
-def test_other_topic_requires_a_reason() -> None:
+def test_other_without_a_reason_is_flagged_not_discarded() -> None:
+    """JSON Schema cannot express "required only when the value is `other`", so
+    the model never sees this rule. Enforcing it by throwing away the whole
+    extraction cost two orders of ~20 verified claims each on the 100-order
+    run; it goes to the review queue instead."""
     _, data = load_fixture(FIXTURES / "extractions" / "eo_14423.json")
     data["primary_topic"] = Domain.OTHER.value
     data["secondary_topics"] = []
     data["topic_other_reason"] = None
-    with pytest.raises(ValidationError, match="topic_other_reason"):
-        Extraction.model_validate(data)
 
+    extraction = Extraction.model_validate(data)
+
+    assert extraction.primary_topic is Domain.OTHER
+    assert extraction.missing_other_reasons == ["primary_topic"]
+    assert extraction.agencies_tasked  # the real work survives
+
+
+def test_other_with_a_reason_is_not_flagged() -> None:
+    _, data = load_fixture(FIXTURES / "extractions" / "eo_14423.json")
+    data["primary_topic"] = Domain.OTHER.value
+    data["secondary_topics"] = []
     data["topic_other_reason"] = "a genuine gap in the vocabulary"
-    assert Extraction.model_validate(data).primary_topic is Domain.OTHER
+
+    assert Extraction.model_validate(data).missing_other_reasons == []
 
 
-def test_other_instrument_requires_a_reason() -> None:
+def test_other_instrument_without_a_reason_is_flagged() -> None:
     _, data = load_fixture(FIXTURES / "extractions" / "eo_12890.json")
     data["instrument"] = Instrument.OTHER.value
-    with pytest.raises(ValidationError, match="instrument_other_reason"):
-        Extraction.model_validate(data)
+
+    assert Extraction.model_validate(data).missing_other_reasons == ["instrument"]
 
 
 def test_repeated_topic_is_normalised_away_not_rejected() -> None:
