@@ -189,13 +189,17 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 
 ### Still open, in rough priority order
 
-- **The three contested gold `instrument` labels** -- EO 14081, EO 13489,
-  EO 14287. Free, needs a human, and they now anchor a 1,534-order dataset rather
-  than a 100-order pilot. EO 14081 is the tractable one: it turns on whether an
-  *Initiative* counts as a *body*, which the convention never says. See
-  [DATA_QUALITY.md](DATA_QUALITY.md) §4.
-- **The 63 relationship disagreements** in the review queue, where the model
-  contradicted an authoritative Federal Register disposition note.
+- ~~The three contested gold `instrument` labels~~ **Resolved 2026-09-04 by
+  hand review** (gold set v2). EO 14081 gold confirmed, EO 14287 relabelled to
+  `directs_report_or_study`, EO 13489 no longer disputed. Two convention gaps were
+  the real cause and are now closed: a *body* has membership (a program or
+  Initiative is not one), and `delegates_authority` means conferring the
+  President's own functions, not merely directing an official. Run 11 instrument
+  agreement rose 90% -> 95%. See [DATA_QUALITY.md](DATA_QUALITY.md) §4.
+- ~~The 63 relationship disagreements~~ **Resolved 2026-09-04 by decision: the
+  Federal Register wins.** Model rows superseded by an FR row carry
+  `authoritative = 0`; 174 contradict FR outright. This also fixed a 27%
+  overcount in `revocation_network`.
 - **Improve deadline parsing** -- only 888 of 2,240 descriptions (40%) yield a
   duration, so median-deadline figures cover the parseable subset only.
 - **Instrument taxonomy v8**: `continues_body` plus precedence clarity, *not* a

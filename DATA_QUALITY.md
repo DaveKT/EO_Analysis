@@ -77,7 +77,7 @@ exits non-zero. Run 11's results, against the 100-order pilot they were tuned on
 | truncation | 0 | 0 | 0 |
 | **`other` rate** | **≤ 3%** | **7.3% — FAILS** | 3.0% |
 | gold: primary_topic | ≥ 80% | 90% | 80% |
-| gold: instrument | ≥ 75% | 90% | 85% |
+| gold: instrument | ≥ 75% | 95% | 85% |
 | groundedness | reported | 94.0% | 94.8% |
 
 **Zero truncations across all 1,534 orders**, including the 154,440-character
@@ -102,24 +102,37 @@ quotes are real, not that the reading is right.
 during development (EO 13985, EO 14081), caught only because the labelling
 convention gave an objective precedence test.
 
-**Three `instrument` labels remain contested and are unresolved.** In the
-frontier-model comparison, two independently-trained models disagreed with the
-gold label on the same three orders:
+**The contested labels were reviewed by hand on 2026-09-04** (gold set version 2).
+Three had been disputed; the review resolved all three and, more usefully, fixed
+two gaps in the *convention* that had caused them.
 
-| Order | Gold says | `gpt-oss-120b` | `gpt-5.4` |
+| Order | Was | Now | Resolution |
 |---|---|---|---|
-| EO 14081 | `directs_report_or_study` | `creates_body` | `creates_body` |
-| EO 13489 | `delegates_authority` | `revokes_or_amends` | `adjusts_pay_or_admin` |
-| EO 14287 | `delegates_authority` | `imposes_sanctions` | `other` |
+| EO 14081 | `directs_report_or_study` | unchanged | **Gold confirmed.** Its only "shall establish" clauses create an *Initiative* and a *program*, neither of which is a body |
+| EO 14287 | `delegates_authority` | **`directs_report_or_study`** | **Relabelled.** The operative act is publishing a list on a 30-day deadline |
+| EO 13489 | `delegates_authority` | unchanged | No longer disputed — run 11 agrees |
 
-Two independent models reading the same text the same way is evidence about the
-*label*, which nothing else checks. EO 14081 is the clear case: it establishes a
-"Data for the Bioeconomy Initiative" and a national Initiative, both models call
-that `creates_body`, and the convention never says whether a **program** counts as
-a **body**. That is an underspecified rule, not a misapplied one.
+Two clarifications were added to the labelling convention, because the
+disagreements were rule gaps rather than misreadings:
 
-**Consequence for you:** the 90% gold agreement figure rests on 20 labels, three
-of which are disputed. Treat it as a sanity check, not a precision measurement.
+- **A "body" has membership** — a council, commission, task force, board or
+  working group. A program, initiative or fund is not a body, however
+  substantial. Three separate extraction runs read EO 14081's "Data for the
+  Bioeconomy Initiative" as `creates_body`; the rule had never said.
+- **`delegates_authority` means conferring the President's own statutory or
+  constitutional functions** on an official. Merely directing an official to act
+  is not delegation — otherwise nearly every order qualifies.
+
+**A caution the review exposed.** The model's *summary* of EO 14081 cites an
+"Interagency Technical Working Group" and a "Biosafety and Biosecurity
+Innovation Initiative" as bodies the order establishes. Neither phrase appears
+anywhere in the order's text. This is §6.6 in action: `summary` is unverified
+free text, and it named entities that do not exist. Only `source_quote` is
+checked.
+
+**Consequence for you:** instrument agreement is now 95% (19/20) and topic 90%
+(18/20) on run 11. Both still rest on 20 labels written by a model and reviewed
+by a non-expert. Treat them as a sanity check, not a precision measurement.
 
 ---
 
@@ -323,8 +336,10 @@ A checklist for not overstating what is here.
 6. **Say "parseable deadlines"** if you quote deadline medians.
 7. **Treat `other` (7.3%) as a taxonomy limit**, not as a finding about the
    orders.
-8. **Do not treat the gold-set agreement as precision.** Twenty labels, three
-   disputed, written by a model rather than an expert.
+8. **Do not treat the gold-set agreement as precision.** Twenty labels, written
+   by a model and reviewed by a non-expert. The disputed ones were resolved on
+   2026-09-04; that raised instrument agreement to 95%, which is a statement
+   about 20 orders, not about 1,534.
 9. **Check the two-term problem** before any per-year rate.
 10. **Re-verify if it matters.** Join `all_claims` to `order_text` and check the
     quotes yourself; the data ships with everything needed to do it.

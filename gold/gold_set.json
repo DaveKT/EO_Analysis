@@ -1,11 +1,13 @@
 {
-  "version": "1",
+  "version": "2",
   "created": "2026-09-03",
   "labelled_by": "hand-read from the source text of each order, not model output",
   "convention": [
     "primary_topic is the subject domain the order operates in. For an order whose main act is amending or extending an earlier body, the topic is that body's domain, not 'government_administration'.",
     "instrument is decided by precedence, not by emphasis: (1) establishes a new body -> creates_body; (2) blocks property or restricts trade -> imposes_sanctions; (3) mainly revokes/amends/terminates -> revokes_or_amends; (4) assigns powers to an official -> delegates_authority; (5) requires a report or study -> directs_report_or_study; (6) pay, succession or internal admin -> adjusts_pay_or_admin. Take the first that matches.",
-    "A significance field was dropped on 2026-09-03: the model rated 19 of 25 orders 'major' and none 'routine', agreeing with these labels 0% of the time, and unlike every other field it had no textual referent to check against."
+    "A significance field was dropped on 2026-09-03: the model rated 19 of 25 orders 'major' and none 'routine', agreeing with these labels 0% of the time, and unlike every other field it had no textual referent to check against.",
+    "Clarified 2026-09-04, rule (1): a 'body' is an entity with membership -- a council, commission, task force, board or working group. A program, initiative or fund is NOT a body, however substantial. EO 14081 turned on this: its only 'shall establish' clause creates a Data for the Bioeconomy Initiative, and three extraction runs read that as creates_body. The rule was underspecified, not misapplied.",
+    "Clarified 2026-09-04, rule (4): delegates_authority means conferring the President's own statutory or constitutional functions on an official. Merely directing an official to act is not delegation -- otherwise nearly every order qualifies. EO 14287 was relabelled directs_report_or_study on this basis."
   ],
   "selection": "Every fifth order of the 100-order spread sample, so a 100-order run overlaps it fully. Spans all six presidencies, and includes both the shortest order in the corpus (EO 12890, 760 chars) and the longest in the sample (EO 14081, 54,068 chars).",
   "labels": [
@@ -109,7 +111,7 @@
       "eo_number": 14081,
       "primary_topic": "technology_and_research",
       "instrument": "directs_report_or_study",
-      "note": "Whole-of-government biotechnology and biomanufacturing initiative; the operative sections are agency directives and reports. Longest order in the sample at 54,068 chars."
+      "note": "Whole-of-government biotechnology initiative; the operative sections are agency directives and reporting deadlines. Confirmed 2026-09-04 against the source: the only 'shall establish' clauses create a Data for the Bioeconomy Initiative and a biobased procurement program -- neither is a body with membership. The 'Interagency Technical Working Group' and 'Biosafety and Biosecurity Innovation Initiative' cited in model summaries appear nowhere in the order's text."
     },
     {
       "eo_number": 14105,
@@ -126,9 +128,10 @@
     {
       "eo_number": 14287,
       "primary_topic": "immigration",
-      "instrument": "delegates_authority",
-      "note": "Directs the Attorney General and Secretary of Homeland Security to designate sanctuary jurisdictions and pursue consequences."
+      "instrument": "directs_report_or_study",
+      "note": "Directs the Attorney General and Secretary of Homeland Security to publish a list of sanctuary jurisdictions within 30 days, notify them, and pursue funding actions. Relabelled 2026-09-04 from delegates_authority: the operative act is a required output on a deadline, and directing an official to act is not delegating the President's functions. Four readers had given four answers (delegates_authority, imposes_sanctions, other, directs_report_or_study)."
     }
   ],
-  "revision": "2026-09-03: adopted the instrument precedence rule. EO 13985 relabelled directs_report_or_study -> creates_body, because it states 'There is hereby established an Interagency Working Group on Equitable Data' and rule 1 outranks the equity assessments it also directs. EO 14081 was checked under the same rule and keeps directs_report_or_study: it establishes no entity, so the model's creates_body was wrong."
+  "revision": "2026-09-03: adopted the instrument precedence rule. EO 13985 relabelled directs_report_or_study -> creates_body, because it states 'There is hereby established an Interagency Working Group on Equitable Data' and rule 1 outranks the equity assessments it also directs. EO 14081 was checked under the same rule and keeps directs_report_or_study: it establishes no entity, so the model's creates_body was wrong.",
+  "revised": "2026-09-04"
 }
