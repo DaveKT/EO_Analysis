@@ -15,7 +15,9 @@ list of traps — *the first thing to read before querying*;
 **[DATA_QUALITY.md](DATA_QUALITY.md)** is every control, finding and caveat —
 *read it before quoting any number*;
 **[DATA_DICTIONARY.md](DATA_DICTIONARY.md)** is the schema and ERD of
-`data/analysis.db`.
+`data/analysis.db`. Questions raised during analysis but deliberately not yet
+executed, each with its plan and cost, are parked in
+[ROUND_TWO_QUESTIONS.md](ROUND_TWO_QUESTIONS.md).
 
 ---
 
