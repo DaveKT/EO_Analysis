@@ -22,7 +22,7 @@ Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
 | 4 Gates | done | all 8 gates pass on a 100-order sample (run 9) |
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
 | 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
-| 5b Export | done | `eo export`, one run + manifest, CSV |
+| 5b Export | done | `eo export` (CSV) and `eo analysis-db` (SQLite) |
 | 5c Notebook | deferred | see decision below; findings are in the README |
 | 6 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
 

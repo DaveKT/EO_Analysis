@@ -1,0 +1,222 @@
+"""Tests for the standalone analysis database.
+
+Two failure modes are worth pinning. The first is the one every join in this
+file depends on: a claim, its order, its source text and the model's original
+quote must all reach each other by key. The second is subtler and was found by
+running the build -- `source_quote` meant two different things depending on
+`source`, so a groundedness check over the joined table read 70% instead of
+100%. A column whose meaning depends on a sibling column is a trap, and the
+schema now makes it structurally impossible.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+
+import pytest
+
+from eo import analysis_db, db
+
+BODY = (
+    "By the authority vested in me as President, the Secretary of Commerce\n"
+    "shall submit a report within 30 days. Executive Order 100 is revoked."
+)
+
+
+@pytest.fixture
+def source() -> sqlite3.Connection:
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    db.migrate(con)
+    for eo_number in (100, 101):
+        con.execute(
+            "INSERT INTO documents (document_number, eo_number, title, president,"
+            " signing_date, body_text, body_char_count, disposition_notes)"
+            " VALUES (?, ?, ?, 'P', '2020-01-01', ?, ?, 'Revokes: EO 100')",
+            (f"doc-{eo_number}", eo_number, f"Order {eo_number}", BODY, len(BODY)),
+        )
+    for run_id in (1, 2):
+        con.execute(
+            "INSERT INTO extraction_runs (run_id, model, prompt_version, cost_usd)"
+            " VALUES (?, ?, 'v7', 0.5)",
+            (run_id, f"model-{run_id}"),
+        )
+    con.execute(
+        "INSERT INTO extractions (document_number, run_id, summary, primary_topic,"
+        " instrument, secondary_topics, finish_reason) VALUES ('doc-101', 1,"
+        " 'a summary', 'health', 'creates_body', '[\"trade\", \"health\"]', 'stop')"
+    )
+    con.execute(
+        "INSERT INTO extractions (document_number, run_id, summary, primary_topic,"
+        " instrument, secondary_topics, finish_reason) VALUES ('doc-101', 2,"
+        " 'other run', 'trade', 'other', '[]', 'stop')"
+    )
+    con.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote, raw_quote, quote_trimmed) VALUES ('doc-101', 1, 'Commerce',"
+        " 'report', 'the Secretary of Commerce', 'the Secretary of Fiction', 1)"
+    )
+    con.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote) VALUES ('doc-101', 2, 'Other', 't', 'q')"
+    )
+    con.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1, 'revokes',"
+        " 100, 'model', 'Executive Order 100 is revoked')"
+    )
+    con.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', NULL,"
+        " 'revokes', 100, 'fr_disposition_notes', 'Revokes: EO 100')"
+    )
+    con.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1, 'amends',"
+        " 9999, 'model', 'the Secretary of Commerce')"
+    )
+    con.execute(
+        "INSERT INTO review_queue (run_id, document_number, kind, detail, created_at)"
+        " VALUES (1, 'doc-101', 'ungrounded_deadlines', 'drifted', '2020-01-01')"
+    )
+    con.commit()
+    yield con
+    con.close()
+
+
+@pytest.fixture
+def built(source, tmp_path):
+    path = tmp_path / "analysis.db"
+    counts = analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA foreign_keys = ON")
+    yield con, counts, path
+    con.close()
+
+
+def test_only_the_named_run_is_included(built):
+    con, counts, _ = built
+    assert counts["orders"] == 1
+    assert con.execute("SELECT summary FROM orders").fetchone()[0] == "a summary"
+    names = [r[0] for r in con.execute("SELECT agency_name FROM agencies_tasked")]
+    assert names == ["Commerce"]
+
+
+def test_foreign_keys_hold(built):
+    con, _, _ = built
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
+def test_source_text_joins_to_its_order(built):
+    con, _, _ = built
+    row = con.execute(
+        "SELECT o.eo_number, t.body_text FROM orders o"
+        " JOIN order_text t USING (document_number)"
+    ).fetchone()
+    assert row["eo_number"] == 101
+    assert row["body_text"] == BODY
+
+
+def test_raw_quote_links_back_to_its_claim(built):
+    con, _, _ = built
+    row = con.execute(
+        "SELECT a.agency_name, q.source_quote, q.raw_quote"
+        " FROM raw_quotes q JOIN agencies_tasked a ON a.id = q.claim_id"
+        " WHERE q.claim_table = 'agencies_tasked'"
+    ).fetchone()
+    assert row["agency_name"] == "Commerce"
+    assert row["raw_quote"] == "the Secretary of Fiction"
+    assert row["source_quote"] == "the Secretary of Commerce"
+
+
+def test_raw_quotes_match_the_trimmed_flag(built):
+    con, counts, _ = built
+    trimmed = con.execute(
+        "SELECT COUNT(*) FROM all_claims WHERE quote_trimmed = 1"
+    ).fetchone()[0]
+    assert counts["raw_quotes"] == trimmed
+
+
+def test_secondary_topics_are_exploded(built):
+    con, counts, _ = built
+    topics = sorted(r[0] for r in con.execute("SELECT topic FROM order_secondary_topics"))
+    assert topics == ["health", "trade"]
+    assert counts["order_secondary_topics"] == 2
+    # The raw array is kept as well, so nothing is lost.
+    assert '"trade"' in con.execute("SELECT secondary_topics_json FROM orders").fetchone()[0]
+
+
+def test_federal_register_evidence_is_not_a_source_quote(built):
+    """The trap this schema exists to remove: an FR disposition note is *about*
+    the order and appears nowhere inside it, so filing it as `source_quote`
+    makes any groundedness check over the join read far below 100%."""
+    con, _, _ = built
+    fr = con.execute(
+        "SELECT source_quote, fr_disposition_note FROM relationships"
+        " WHERE source = 'fr_disposition_notes'"
+    ).fetchone()
+    assert fr["source_quote"] is None
+    assert fr["fr_disposition_note"] == "Revokes: EO 100"
+
+    model = con.execute(
+        "SELECT source_quote, fr_disposition_note FROM relationships"
+        " WHERE source = 'model' AND relation = 'revokes'"
+    ).fetchone()
+    assert model["source_quote"] == "Executive Order 100 is revoked"
+    assert model["fr_disposition_note"] is None
+
+
+def test_every_all_claims_quote_is_in_its_order_text(built):
+    """The dataset's central contract, checkable inside this database alone --
+    which the CSV export could not support."""
+    from eo import grounding
+
+    con, _, _ = built
+    rows = con.execute(
+        "SELECT c.source_quote, t.body_text FROM all_claims c"
+        " JOIN order_text t USING (document_number)"
+    ).fetchall()
+    assert rows
+    assert all(grounding.is_grounded(r["source_quote"], r["body_text"]) for r in rows)
+
+
+def test_unresolvable_relationship_targets_are_null_not_dropped(built):
+    con, _, _ = built
+    row = con.execute(
+        "SELECT target_eo_number, target_document_number FROM relationships"
+        " WHERE relation = 'amends'"
+    ).fetchone()
+    assert row["target_eo_number"] == 9999
+    assert row["target_document_number"] is None
+
+    resolved = con.execute(
+        "SELECT target_document_number FROM relationships"
+        " WHERE relation = 'revokes' AND source = 'model'"
+    ).fetchone()[0]
+    assert resolved is None  # EO 100 was never extracted, so it is not an order here
+
+
+def test_run_metadata_records_provenance(built):
+    con, _, _ = built
+    row = con.execute("SELECT * FROM run_metadata").fetchone()
+    assert row["run_id"] == 1
+    assert row["model"] == "model-1"
+    assert "1994" in row["coverage"]
+    assert "fr_disposition_note" in row["quote_contract"]
+
+
+def test_rebuild_replaces_rather_than_appends(source, tmp_path):
+    path = tmp_path / "analysis.db"
+    analysis_db.build(source, path, 1)
+    counts = analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    assert con.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == counts["orders"]
+    assert con.execute("SELECT COUNT(*) FROM run_metadata").fetchone()[0] == 1
+    con.close()
+
+
+def test_unknown_run_is_an_error(source, tmp_path):
+    with pytest.raises(ValueError, match="no such run"):
+        analysis_db.build(source, tmp_path / "x.db", 99)

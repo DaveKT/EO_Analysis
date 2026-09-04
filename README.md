@@ -54,8 +54,63 @@ eo extract    # Phase 3: the LLM pass
 eo validate   # Phase 4: quality gates
 eo review     # Phase 4: what the gates parked for human review
 eo compare    # two runs, head to head over the documents both cover
+eo analysis-db # one run + its source text as a standalone, joinable database
 eo export     # one run to flat files, with a provenance manifest
 ```
+
+### The analysis database
+
+`eo analysis-db --run-id 11` builds **`data/analysis.db`** (23 MB): one run, its
+source text, and nothing else — no prior runs, no raw model responses, no
+pipeline machinery. Foreign keys are declared and checked at build time, so
+everything joins.
+
+```
+run_metadata             1  which model, prompt, cost, coverage — read this first
+orders               1,534  PK document_number, UNIQUE eo_number
+order_text           1,534  body_text, split out because it is 15 MB
+order_secondary_topics 313  the JSON array exploded into joinable rows
+agencies_tasked      3,195  id PK -> orders
+deadlines            2,240  id PK -> orders
+authorities          1,707  id PK -> orders
+relationships        5,765  id PK -> orders, target_document_number -> orders
+raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
+review_queue           866  id PK -> orders
+```
+
+Two views come with it: `revocation_network` (both endpoints already resolved to
+real orders) and `all_claims` (every quoted claim in one shape).
+
+```sql
+-- who revokes whom, across administrations
+SELECT source_president, target_president, COUNT(*)
+FROM revocation_network WHERE relation = 'revokes' GROUP BY 1, 2 ORDER BY 3 DESC;
+
+-- an order's whole evidence trail, including what the model originally wrote
+SELECT c.claim_table, c.claim, c.source_quote, q.raw_quote
+FROM all_claims c
+LEFT JOIN raw_quotes q ON q.claim_table = c.claim_table AND q.claim_id = c.id
+WHERE c.document_number = (SELECT document_number FROM orders WHERE eo_number = 14081);
+```
+
+Three things to know before writing queries against it:
+
+- **`source_quote` means exactly one thing: verbatim text from that order's
+  `body_text`.** Federal Register relationship rows carry no `source_quote` —
+  their evidence is an editorial disposition note ("Revokes: EO 12088…") that is
+  *about* the order and appears nowhere inside it, so it lives in
+  `fr_disposition_note` instead. The working database stores both in one column,
+  which makes a groundedness check over the joined table read ~70% instead of
+  100%. Splitting them is why this database can verify its own central claim:
+  joining `all_claims` to `order_text` gives **8,989/8,989 = 100%**.
+- **`target_document_number` is NULL for ~21% of relationship targets.** Those
+  point at pre-1994 orders outside the Federal Register's full-text coverage.
+  `target_eo_number` is still populated, so an unresolvable target is visibly
+  unresolvable rather than a join that silently drops rows.
+- **Agency names are not normalised.** `Secretary of the Treasury` and
+  `Department of the Treasury` are distinct rows.
+
+### Flat files
 
 `eo export --run-id 11` writes `orders`, `agencies_tasked`, `deadlines`,
 `authorities`, `relationships` and `review_queue` to `data/export/`, plus a

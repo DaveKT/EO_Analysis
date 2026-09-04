@@ -14,6 +14,7 @@ from pathlib import Path
 import typer
 
 from eo import __version__, db, dispositions, ingest, prompts
+from eo import analysis_db as analysis_db_mod
 from eo import compare as compare_mod
 from eo import export as export_mod
 from eo import extract as extract_mod
@@ -21,6 +22,7 @@ from eo import validate as validate_mod
 from eo.config import API_KEY_VAR, Settings, load_settings
 
 DEFAULT_EXPORT_DIR = "data/export"
+DEFAULT_ANALYSIS_DB = "data/analysis.db"
 
 app = typer.Typer(
     add_completion=False,
@@ -567,6 +569,31 @@ def compare(
         f"cost   run {base.run_id} ${base.cost_usd:.4f} over {base.rows} rows"
         f"   |   run {cand.run_id} ${cand.cost_usd:.4f} over {cand.rows} rows"
     )
+
+
+@app.command("analysis-db")
+def analysis_db(
+    run_id: int = typer.Option(..., "--run-id", help="Run to package."),
+    out: str = typer.Option(
+        DEFAULT_ANALYSIS_DB, "--out", help="Database file to write."
+    ),
+) -> None:
+    """Build a standalone analysis database: one run, its source text, joinable."""
+    settings = load_settings()
+    target = Path(out)
+    with db.session(settings.db_path) as con:
+        try:
+            counts = analysis_db_mod.build(con, target, run_id)
+        except ValueError as exc:
+            typer.secho(str(exc), fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2) from exc
+
+    size = target.stat().st_size
+    typer.echo(f"built {target} from run {run_id}  ({size / 1e6:,.1f} MB)")
+    for name, count in counts.items():
+        typer.echo(f"  {name:<24} {count:>7,}")
+    typer.echo("")
+    typer.echo("views: revocation_network, all_claims")
 
 
 def main() -> None:
