@@ -265,7 +265,7 @@ Statutes and constitutional clauses the order invokes.
 | `source_quote` | TEXT | verbatim |
 | `quote_trimmed` | INTEGER | as above |
 
-### `relationships` — 5,765 rows
+### `relationships` — 5,766 rows
 
 What an order does to other orders. **Two sources with different evidence.**
 
@@ -279,7 +279,7 @@ What an order does to other orders. **Two sources with different evidence.**
 | `target_type` | TEXT | 13% | `executive_order`, `proclamation`, `memorandum`, `notice`, `determination` |
 | `target_label` | TEXT | — | as named in the source, e.g. `Proc. 9704` |
 | `in_part` | INTEGER | — | FR's "in part" qualifier |
-| `source` | TEXT | — | `model` (1,847) or `fr_disposition_notes` (3,918) |
+| `source` | TEXT | — | `model` (1,847) or `fr_disposition_notes` (3,919) |
 | `source_quote` | TEXT | 68% | **model rows only** — verbatim from the order |
 | `fr_disposition_note` | TEXT | 32% | **FR rows only** — an editorial note *about* the order |
 | `quote_trimmed` | INTEGER | — | as above |
@@ -296,9 +296,9 @@ assert what a later order will do to it.
 > **Filter on `authoritative = 1` when counting.** The Federal Register is the
 > authoritative record of what an order does to earlier orders, so where FR and
 > the model both cover a pair, the FR row wins and the model's is marked 0 —
-> including when they agree. 3,918 FR edges + 930 model edges on pairs FR is
+> including when they agree. 3,919 FR edges + 930 model edges on pairs FR is
 > silent about are authoritative; 917 model edges are superseded. Counting all
-> 5,765 inflates the revocation network by 27%.
+> 5,766 inflates the revocation network by 27%.
 
 > **The `source_quote` / `fr_disposition_note` split matters.** `source_quote`
 > always means verbatim text from that order. Federal Register rows carry no
@@ -397,7 +397,7 @@ GROUP BY agency_id ORDER BY orders DESC LIMIT 10;
 
 Relationship edges with **both endpoints resolved to real orders** and
 **`authoritative = 1`**, so it is safe to group by president and each edge counts
-once. Filtered to `revokes`, `amends`, `supersedes`, `continues`. **850 rows.**
+once. Filtered to `revokes`, `amends`, `supersedes`, `continues`. **851 rows.**
 Excludes the ~21% of edges whose target is outside the corpus.
 
 ```sql

@@ -29,7 +29,7 @@ WHERE kind NOT IN ('collective', 'generic')
 ```
 
 **3. Relationships must be filtered to authoritative rows.** The Federal Register
-and the model both assert many of the same edges. Counting all 5,765 inflates the
+and the model both assert many of the same edges. Counting all 5,766 inflates the
 network by 27%.
 
 ```sql

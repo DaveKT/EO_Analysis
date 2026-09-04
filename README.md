@@ -101,7 +101,7 @@ order_secondary_topics 313  the JSON array exploded into joinable rows
 agencies_tasked      3,195  id PK -> orders
 deadlines            2,240  id PK -> orders
 authorities          1,707  id PK -> orders
-relationships        5,765  id PK -> orders, target_document_number -> orders
+relationships        5,766  id PK -> orders, target_document_number -> orders
 raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
 review_queue           866  id PK -> orders
 agencies               598  canonical agencies

@@ -123,3 +123,17 @@ def test_seeding_is_idempotent() -> None:
     assert row["source"] == dispositions.FR_SOURCE
     assert row["run_id"] is None  # seeded rows belong to no extraction run
     con.close()
+
+
+def test_parenthetical_qualifier_is_part_of_the_label() -> None:
+    """EO 14109's note reads "Supersedes: EO 14048 ... Superseded by (in part):
+    EO 14354". Without the parenthetical in the label regex, the second line was
+    swallowed into the first and a Biden order "superseded" a Trump 47 order."""
+    rels = parse(
+        "Supersedes: EO 14048, September 30, 2021\n"
+        "Superseded by (in part): EO 14354, September 29, 2025"
+    )
+    assert [(r.relation, r.target_eo_number, r.in_part) for r in rels] == [
+        ("supersedes", 14048, False),
+        ("superseded_by", 14354, True),
+    ]

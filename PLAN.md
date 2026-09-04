@@ -27,7 +27,7 @@ list of traps — *the first thing to read before querying*;
 |---|---|---|
 | 0 Reset | done | v1 in `archive/`, `my_secrets.py` deleted, package scaffolded |
 | 1 Ingest | done | 1,556 documents, EO 12890 (1993-12-30) -> EO 14423 (2026-08-28) |
-| 2 Contract | done | `models.py` + 3,924 FR relationship edges seeded |
+| 2 Contract | done | `models.py` + 3,925 FR relationship edges seeded |
 | 3 Runner | done | `providers.py` + `extract.py`, resumable, bounded async |
 | 4 Gates | done | all 8 gates pass on a 100-order sample (run 9) |
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
@@ -44,7 +44,8 @@ list of traps — *the first thing to read before querying*;
 
 - `documents`: 1,556 rows. `extractable_documents` view: **1,534** -- one canonical
   row per EO number, excluding C1-/Z9- corrections and preferring R1- reprints.
-- `relationships` with `run_id IS NULL`: 3,924 edges seeded from FR disposition notes.
+- `relationships` with `run_id IS NULL`: 3,925 edges seeded from FR disposition notes
+  (re-seeded 2026-09-04 after the parser learned parenthetical labels).
 - `extraction_runs`: 11 runs. **Run 11 is the shipped dataset** -- the full corpus.
   Run 9 (prompt v7, 100 orders) was the pilot and the sweep's baseline. Runs 1-8 are kept deliberately: they are the
   evidence for the prompt decisions below, and diffing them is the point of

@@ -19,8 +19,12 @@ from dataclasses import dataclass
 
 FR_SOURCE = "fr_disposition_notes"
 
-# "Label: targets" segments. Labels are short verb phrases ending in a colon.
-_LABEL_RE = re.compile(r"([A-Za-z][A-Za-z .]{2,34}?):\s*")
+# "Label: targets" segments. Labels are short verb phrases ending in a colon,
+# occasionally with a parenthetical qualifier: "Superseded by (in part):". The
+# qualifier must be part of the label, or the whole segment is swallowed into
+# the preceding label's body and the target is credited to the wrong relation
+# -- which is how EO 14109 (Biden) came to "supersede" EO 14354 (Trump 47).
+_LABEL_RE = re.compile(r"([A-Za-z][A-Za-z .]{2,34}?(?:\s*\([^)]{0,20}\))?):\s*")
 
 # Labels that introduce prose or a citation rather than a document reference.
 _SKIP_LABELS = {"note", "federal register page and date", "see also note"}
@@ -81,7 +85,8 @@ def _relations_for_label(label: str) -> list[str]:
     Handles direction ('Revoked by'), partiality ('Revokes in part'), and the
     one compound label in the corpus ('Revokes in part and supplements').
     """
-    text = label.strip().lower().rstrip(".")
+    text = re.sub(r"\s*\([^)]*\)", " ", label).strip().lower().rstrip(".")
+    text = re.sub(r"\s+", " ", text)
     if text in _SKIP_LABELS:
         return []
 

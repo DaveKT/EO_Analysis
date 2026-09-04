@@ -220,7 +220,7 @@ extracted at least one tasked agency from 66% of orders" is.
 
 | | Edges | Name an EO number | Resolve to an order here |
 |---|---|---|---|
-| Federal Register | 3,918 | 3,343 | 2,778 |
+| Federal Register | 3,919 | 3,344 | 2,779 |
 | Model | 1,847 | 1,089 | 704 |
 
 `target_document_number` is NULL for the rest, mostly because the target is a
@@ -228,6 +228,18 @@ pre-1994 order outside this corpus, or a proclamation/memorandum rather than an
 EO. **A revocation-network analysis silently drops those.** `target_eo_number`
 is still populated, so an unresolvable target is visibly unresolvable rather than
 missing.
+
+**Fourteen Federal Register notes point the wrong way.** A forward relation
+(`amends`, `supersedes`) cannot target an order signed *after* the acting one,
+yet FR writes "Amends: EO 13286, February 28, 2003" on eight orders that EO
+13286 — the 2003 omnibus amendment — amended, and the same inversion appears on
+six others. These are the Register's own notes, reproduced faithfully, not
+parser errors; the parser fault that did exist (labels with a parenthetical,
+"Superseded by (in part):", swallowed into the preceding label) was fixed on
+2026-09-04 and re-seeded. **When you count what an order did, drop forward edges
+whose target postdates the source** — the later order's own note carries the
+relationship the right way round. `notebooks/analysis.ipynb` does this and
+prints how many it dropped.
 
 **The Federal Register wins wherever it has an opinion.** Its disposition notes
 are the authoritative record of what an order does to earlier orders. Where FR
@@ -238,7 +250,7 @@ counting both inflated the revocation network by **27%**. An early version of th
 figures in the README made exactly that mistake (Trump→Biden read 124; the
 deduplicated figure is 106).
 
-- 3,918 FR edges: always authoritative.
+- 3,919 FR edges: always authoritative.
 - 930 model edges on pairs FR is silent about: authoritative. Finding these is
   the point of extraction.
 - 917 model edges superseded by FR, of which **174 contradict** it
