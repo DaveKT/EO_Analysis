@@ -109,11 +109,13 @@ def test_unrecognised_names_become_their_own_entity_not_a_bucket():
     assert not matched
 
 
-def test_war_is_not_merged_into_defense():
-    """EO 14347 renamed Defense to War in 2025. Collapsing them would erase a
-    real change on nothing but this module's assumption."""
-    assert agencies.resolve("Secretary of War")[0] == ["Department of War"]
-    assert agencies.resolve("Secretary of Defense")[0] == ["Department of Defense"]
+def test_war_and_defense_are_one_institution():
+    """EO 14347 (2025-09-05) renamed Defense to War. It is one department across
+    the rename, so both names resolve to one canonical agency. The rename is not
+    lost -- the raw name each order used is preserved on the mention."""
+    for raw in ("Secretary of War", "Department of War",
+                "Secretary of Defense", "Department of Defense"):
+        assert agencies.resolve(raw)[0] == ["Department of Defense"], raw
 
 
 def test_military_departments_stay_distinct_from_defense():

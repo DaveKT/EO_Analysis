@@ -134,8 +134,8 @@ GROUP BY agency_id ORDER BY taskings DESC LIMIT 10;
 | Department of Justice | 293 | 119 |
 | Department of Commerce | 267 | 101 |
 | Department of the Treasury | 267 | 144 |
+| Department of Defense | 259 | 103 |
 | Department of State | 247 | 115 |
-| Department of Defense | 205 | 94 |
 | Office of Management and Budget | 196 | 104 |
 
 Four rules govern the mapping, each because the obvious approach is wrong:
@@ -156,12 +156,23 @@ Four rules govern the mapping, each because the obvious approach is wrong:
   `all contracting agencies` does not, because it names a subset and merging it
   would claim the whole executive branch was tasked.
 
-`Secretary of X` and `Department of X` are deliberately merged — one institution
-for the purpose of counting. **`Department of War` is deliberately not merged into
-`Department of Defense`**: EO 14347 (2025-09-05) renamed it, and collapsing them
-would erase a real change on nothing but an assumption. They appear as separate
-canonical agencies (205 and 54 taskings) with the rename recorded in
-`agencies.note`; join on both to count the institution as one.
+`Secretary of X` and `Department of X` are merged — one institution for the
+purpose of counting. **`Department of War` resolves to `Department of Defense`**
+for the same reason: EO 14347 (2025-09-05) renamed the department, and it is one
+institution across the rename.
+
+Nothing is lost by that merge. The name each order actually used is preserved on
+every mention, so the Department of War period stays queryable:
+
+```sql
+SELECT raw_name, COUNT(*), MIN(signing_date), MAX(signing_date)
+FROM agency_taskings
+WHERE canonical_name = 'Department of Defense' AND raw_name LIKE '%War%'
+GROUP BY raw_name;
+-- 54 taskings, 2025-09-05 → 2026-07-20
+```
+
+The rename is recorded in `agencies.note` on the Department of Defense row.
 
 `deadlines.responsible_party` is normalised by the same rules — it carries the
 same names and the same split, and doing only one table would leave the other

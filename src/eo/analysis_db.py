@@ -294,7 +294,7 @@ def _resolve_agencies(out: sqlite3.Connection) -> dict[str, int]:
                     ids[name] = len(ids) + 1
                     note = (
                         agencies.DEFENSE_NOTE
-                        if name in ("Department of War", "Department of Defense")
+                        if name == "Department of Defense"
                         else None
                     )
                     rows.append(

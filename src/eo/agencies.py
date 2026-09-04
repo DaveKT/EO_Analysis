@@ -26,9 +26,10 @@ this mapping is visible and fixable without re-running anything.
 
 Department vs. Secretary is deliberately merged: the Secretary of Commerce and
 the Department of Commerce are one institution for the purpose of counting who
-gets tasked. Department of War is deliberately *not* merged into Department of
-Defense -- it is the September 2025 renaming, and collapsing them would erase a
-real change on nothing but this module's assumption. See DEFENSE_NOTE.
+gets tasked. Department of War is merged into Department of Defense for the same
+reason -- EO 14347 renamed it in September 2025, and it is one department across
+the rename. Nothing is lost by that: the name each order used survives in
+agency_mentions.raw_name. See DEFENSE_NOTE.
 """
 
 from __future__ import annotations
@@ -44,8 +45,11 @@ BODY = "body"
 
 DEFENSE_NOTE = (
     "Executive Order 14347 (2025-09-05) renamed the Department of Defense the"
-    " Department of War. They are kept as separate canonical agencies here so the"
-    " rename stays visible; join on both to count the institution as one."
+    " Department of War, for the current administration. Both names resolve to"
+    " this one canonical agency, because they are one institution. The rename"
+    " is not lost: the name each order actually used is preserved in"
+    " agency_mentions.raw_name and agencies_tasked.agency_name, so"
+    " WHERE raw_name LIKE '%War%' recovers the Department of War period."
 )
 
 # (canonical name, kind, aliases). Aliases are matched against the cleaned form
@@ -58,10 +62,12 @@ _CANONICAL: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Department of the Treasury", DEPARTMENT,
      ("department of the treasury", "secretary of the treasury", "treasury department",
       "treasury")),
+    # Department of War is the September 2025 renaming of the same institution
+    # (EO 14347), so both names resolve here. See DEFENSE_NOTE for how to
+    # recover the distinction, which the raw names preserve.
     ("Department of Defense", DEPARTMENT,
-     ("department of defense", "secretary of defense", "defense department", "dod")),
-    ("Department of War", DEPARTMENT,
-     ("department of war", "secretary of war")),
+     ("department of defense", "secretary of defense", "defense department", "dod",
+      "department of war", "secretary of war")),
     ("Department of Justice", DEPARTMENT,
      ("department of justice", "attorney general", "justice department", "doj")),
     ("Department of the Interior", DEPARTMENT,

@@ -279,3 +279,34 @@ def test_a_compound_agency_row_credits_every_agency_named(source, tmp_path):
     }
     assert names == {"Department of Justice", "Department of Homeland Security"}
     con.close()
+
+
+def test_the_war_rename_is_recoverable_from_raw_names(source, tmp_path):
+    """Merging War into Defense must not erase which name an order used."""
+    source.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote) VALUES ('doc-101', 1, 'Secretary of War', 't', 'q')"
+    )
+    source.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote) VALUES ('doc-101', 1, 'Secretary of Defense', 't2', 'q')"
+    )
+    source.commit()
+    path = tmp_path / "war.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+
+    rows = con.execute(
+        "SELECT raw_name FROM agency_taskings"
+        " WHERE canonical_name = 'Department of Defense' ORDER BY raw_name"
+    ).fetchall()
+    assert [r["raw_name"] for r in rows] == ["Secretary of Defense", "Secretary of War"]
+    assert con.execute(
+        "SELECT COUNT(*) FROM agencies WHERE canonical_name = 'Department of War'"
+    ).fetchone()[0] == 0
+    note = con.execute(
+        "SELECT note FROM agencies WHERE canonical_name = 'Department of Defense'"
+    ).fetchone()[0]
+    assert "14347" in note and "raw_name" in note
+    con.close()
