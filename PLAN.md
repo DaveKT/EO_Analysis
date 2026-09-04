@@ -1,7 +1,8 @@
 # Executive Order Analysis — Development Plan
 
-**Status:** Phases 0-4 complete and pushed to `main`. Phase 5 (full sweep) not started.
-Written 2026-09-03; status section below updated 2026-09-03 after Phase 4 closed.
+**Status:** Phases 0-4 complete and pushed to `main`. The frontier-model
+comparison is done (run 10). Phase 5 (full sweep) not started.
+Written 2026-09-03; updated 2026-09-04 after the frontier comparison closed.
 **Read this first if you are a fresh session picking up the work.**
 
 ---
@@ -17,6 +18,7 @@ Written 2026-09-03; status section below updated 2026-09-03 after Phase 4 closed
 | 2 Contract | done | `models.py` + 3,924 FR relationship edges seeded |
 | 3 Runner | done | `providers.py` + `extract.py`, resumable, bounded async |
 | 4 Gates | done | all 8 gates pass on a 100-order sample (run 9) |
+| 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
 | 5 Full sweep | **not started** | ~1,534 orders, ~$1.00, ~3 hours |
 | 6 Optional | not started | pre-1994 backfill, `--since`, dashboard |
 
@@ -25,11 +27,12 @@ Written 2026-09-03; status section below updated 2026-09-03 after Phase 4 closed
 - `documents`: 1,556 rows. `extractable_documents` view: **1,534** -- one canonical
   row per EO number, excluding C1-/Z9- corrections and preferring R1- reprints.
 - `relationships` with `run_id IS NULL`: 3,924 edges seeded from FR disposition notes.
-- `extraction_runs`: 9 runs. **Run 9 (prompt v7) is the good one** and the only one
-  that passes every gate. Runs 1-8 are kept deliberately: they are the evidence for
-  the prompt decisions below, and diffing them is the point of versioning by
-  (model, prompt_version).
-- Nothing has been extracted beyond the 100-order sample.
+- `extraction_runs`: 10 runs. **Run 9 (prompt v7) is the good one** for the cheap
+  model and the baseline for the sweep. Runs 1-8 are kept deliberately: they are the
+  evidence for the prompt decisions below, and diffing them is the point of
+  versioning by (model, prompt_version). **Run 10 is the frontier comparison**:
+  `openai/gpt-5.4`, prompt v7, the 36-order comparison set.
+- Nothing has been extracted beyond the 100-order sample and that 36-order subset.
 
 ### Run 9 results, the baseline to beat
 
@@ -49,6 +52,31 @@ groundedness            94.8%  (reported)
 nondeterministic; a re-run may not clear all eight. Do not present "all gates pass"
 as a stable property of the pipeline.
 
+### Run 10, the frontier comparison — what it settled
+
+`openai/gpt-5.4`, prompt v7, the gold 20 plus run 9's 23 flagged documents (36
+after overlap), $0.85. Reproduce with `eo compare --baseline 9 --candidate 10`.
+
+| Over the same 36 documents | run 9 `gpt-oss-120b` | run 10 `gpt-5.4` |
+|---|---|---|
+| gold: primary_topic | 80% | **100%** |
+| gold: instrument | 85% | 80% |
+| groundedness | 88.6% | **99.8%** |
+| severe drift | 3.7% | **0.0%** |
+| quotes / agencies / authorities | 245 / 74 / 37 | 531 / 248 / 145 |
+
+- **Topic agreement was the cheap model's ceiling, not the task's.** All four
+  misses were the same failure: defaulting to `government_administration` or
+  `foreign_policy` where a specific domain applied. The frontier model missed none.
+- It extracts 2x the claims *and* is more grounded, so it is not scoring well by
+  saying less. Relationships are the exception (46 -> 30).
+- **The 88.6% baseline figure is not comparable to run 9's 94.8%**: this set is
+  deliberately enriched with run 9's failures. Only the head-to-head columns are
+  comparable. Any future comparison must be restricted to shared documents --
+  `compare.py` enforces this, and its tests pin it.
+- Cost of sweeping the full corpus on `gpt-5.4` would be ~$36 against ~$1.00.
+  The cheap sweep remains the plan of record, with the gap recorded in the README.
+
 ### How to run it
 
 ```sh
@@ -66,14 +94,14 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 
 ### What to do next, in order
 
-1. **Frontier-model comparison (~$5, recommended first).** Re-run the gold 20 plus
-   flagged rows on a frontier model. Three gates sit on their thresholds and it is
-   not known whether 94.8% groundedness and 80% topic agreement are this model's
-   ceiling or the task's. The answer belongs in the README as an honest quality
-   figure, and it decides whether the cheap sweep is good enough.
-2. **Phase 5 full sweep.** `eo extract` with no `--limit`, ~1,534 orders, ~$1.00,
+1. ~~Frontier-model comparison~~ **Done 2026-09-04, run 10.** See above. It
+   answered the question it was for: the topic ceiling is the model's, not the
+   task's, and the cheap sweep is still the right call at 1/36th the cost.
+2. **Decide the three contested instrument labels** (below) before the sweep
+   treats the gold set as ground truth. Costs nothing, needs a human.
+3. **Phase 5 full sweep.** `eo extract` with no `--limit`, ~1,534 orders, ~$1.00,
    ~3 hours. Resumable: rerun with `--run-id N` to retry failures.
-3. Notebook analysis, then `eo export`.
+4. Notebook analysis, then `eo export`.
 
 ### Open risks a fresh session should not rediscover the hard way
 
@@ -90,6 +118,14 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
   paragraphs explaining them, and regressed every metric (topic 80->75, instrument
   90->80, other 7->11). v7 kept the categories and deleted the prose: other fell to
   3%. Explaining what a category does *not* cover teaches the model to answer `other`.
+- **`provider.require_parameters` filters in both directions.** It is what makes
+  structured output a guarantee, but a parameter the model does not advertise is not
+  ignored -- it eliminates every candidate endpoint and the request 404s in routing,
+  before any model sees it. `openai/gpt-5.4` fixes its own sampling temperature and
+  does not list `temperature`; sending `temperature=0` failed all 36 documents of the
+  first run 10 attempt at zero cost. The runner now asks
+  `client.supported_parameters(model)` once per run and omits what is unsupported.
+  This will recur with any new model; it is not gpt-5.4-specific.
 - **Provider hazards, all now handled but easy to reintroduce**: OpenRouter routes to
   providers that ignore `response_format` unless `provider.require_parameters` is set;
   httpx timeouts are per socket operation, so a trickling connection hangs forever
@@ -414,7 +450,19 @@ Carry this table into the README. Every v1 failure has exactly one structural fi
 - ~~Confirm significance~~ **Dropped 2026-09-03.** The model rated 19 of 25 orders
   `major` and none `routine`, agreeing with hand labels 0% of the time. Alone among
   the fields it had no textual referent to check against.
-- **Still open:** should a domain expert review the 20 gold labels before the full
-  sweep treats them as ground truth?
+- **Still open, now with evidence: three specific gold `instrument` labels need a
+  human.** Run 10 showed instrument agreement did *not* improve on a far stronger
+  model (85% -> 80%), and three orders are labelled differently by both models
+  independently:
+  - **EO 14081** — establishes a "Data for the Bioeconomy Initiative" and a national
+    Initiative. Both models say `creates_body`; gold says `directs_report_or_study`.
+    The convention's precedence rule never says whether a *program* counts as a
+    *body*. This is an underspecified rule, not a misapplied one — fix the rule.
+  - **EO 13489** (Presidential Records) — gold `delegates_authority`, run 9
+    `revokes_or_amends`, run 10 `adjusts_pay_or_admin`. Three different readings.
+  - **EO 14287** — gold `delegates_authority`, run 9 `imposes_sanctions`, run 10
+    `other`.
+  Two independent models agreeing against the label is evidence about the label,
+  which is the one thing in this project nothing else checks.
 - Decide whether proclamations and presidential memoranda eventually join the corpus. The
   schema supports it; scope currently says EOs only.

@@ -89,6 +89,37 @@ class OpenRouterClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    async def supported_parameters(self, model: str) -> set[str]:
+        """The union of what this model's endpoints advertise.
+
+        `provider.require_parameters` is what makes structured output a
+        guarantee rather than a hope, but it filters in both directions: a
+        parameter the model does not advertise does not get ignored, it
+        eliminates every candidate endpoint and the request 404s with
+        "No endpoints found that can handle the requested parameters".
+
+        openai/gpt-5.4 fixes its own sampling temperature and does not list
+        `temperature`. Sending temperature=0 alongside require_parameters
+        matched zero endpoints and failed all 36 documents of a run -- at zero
+        cost and with no usable error, because the failure is in routing,
+        before any model sees the request.
+
+        A probe that fails is not fatal: an empty set means "assume nothing is
+        supported", which sends the minimal payload and still runs.
+        """
+        try:
+            response = await self._client.get(f"{self._base_url}/models/{model}/endpoints")
+            if response.status_code != 200:
+                return set()
+            endpoints = (response.json().get("data") or {}).get("endpoints") or []
+        except (httpx.HTTPError, ValueError):
+            return set()
+        return {
+            parameter
+            for endpoint in endpoints
+            for parameter in (endpoint.get("supported_parameters") or [])
+        }
+
     @retry(
         retry=retry_if_exception_type(
             (RetryableProviderError, httpx.TransportError, TimeoutError)
@@ -107,7 +138,7 @@ class OpenRouterClient:
         schema: dict[str, Any],
         schema_name: str = "extraction",
         max_tokens: int,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
     ) -> Completion:
         # An absolute deadline per attempt. httpx's timeout is per socket
         # operation, so a server that trickles keep-alive bytes during a long
@@ -132,7 +163,7 @@ class OpenRouterClient:
         schema: dict[str, Any],
         schema_name: str,
         max_tokens: int,
-        temperature: float,
+        temperature: float | None,
     ) -> Completion:
         payload = {
             "model": model,
@@ -149,7 +180,6 @@ class OpenRouterClient:
                 },
             },
             "max_tokens": max_tokens,
-            "temperature": temperature,
             "usage": {"include": True},
             # Without this, OpenRouter may route to a provider that ignores
             # response_format and answers in a shape of its own invention --
@@ -159,6 +189,11 @@ class OpenRouterClient:
             # providers that actually implement it.
             "provider": {"require_parameters": True},
         }
+        # Omitted, not defaulted, when the model does not advertise it. See
+        # `supported_parameters`: with require_parameters set, an unsupported
+        # parameter is not ignored, it eliminates every endpoint.
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         response = await self._client.post(
             f"{self._base_url}/chat/completions",

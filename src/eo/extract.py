@@ -29,6 +29,7 @@ from eo import fr_client, grounding, prompts
 from eo.config import Settings
 from eo.models import Extraction, extraction_json_schema
 from eo.providers import Completion, OpenRouterClient
+from eo.validate import load_gold_set
 
 MODEL_SOURCE = "model"
 
@@ -56,12 +57,43 @@ class RunReport:
         )
 
 
+def comparison_set(
+    con: sqlite3.Connection, baseline_run_id: int
+) -> list[dict[str, Any]]:
+    """The gold set plus every order a baseline run flagged for review.
+
+    These are the two populations worth spending frontier-model tokens on: the
+    orders that have hand-read labels to score against, and the orders where
+    the cheap model's own output was already questioned. Everything else would
+    be paying frontier prices to re-confirm a row nothing has doubted.
+
+    Note what this set is *not*: it is deliberately enriched with one run's
+    failures, so a rate measured over it is not comparable to that run's rate
+    over its whole sample. It supports a per-document diff against the
+    baseline, not a headline quality figure.
+    """
+    gold = load_gold_set()
+    placeholders = ",".join("?" * len(gold)) if gold else "NULL"
+    return [
+        dict(row)
+        for row in con.execute(
+            f"SELECT * FROM extractable_documents"
+            f" WHERE eo_number IN ({placeholders})"
+            f"    OR document_number IN ("
+            f"        SELECT document_number FROM review_queue WHERE run_id = ?)"
+            f" ORDER BY eo_number",
+            (*gold, baseline_run_id),
+        )
+    ]
+
+
 def select_documents(
     con: sqlite3.Connection,
     *,
     limit: int | None,
     run_id: int | None,
     spread: bool,
+    compare_run: int | None = None,
 ) -> list[dict[str, Any]]:
     """Choose which orders to extract.
 
@@ -71,11 +103,20 @@ def select_documents(
 
     `spread` samples evenly across presidencies rather than taking the oldest N,
     so a pilot exercises every era's formatting instead of only Clinton's.
+
+    `compare_run` replaces the sample entirely with the frontier-comparison set
+    (see `comparison_set`); `limit` still applies on top of it, so a comparison
+    can be tried on five orders before committing to all of them.
     """
-    rows = [
-        dict(row)
-        for row in con.execute("SELECT * FROM extractable_documents ORDER BY eo_number")
-    ]
+    if compare_run is not None:
+        rows = comparison_set(con, compare_run)
+    else:
+        rows = [
+            dict(row)
+            for row in con.execute(
+                "SELECT * FROM extractable_documents ORDER BY eo_number"
+            )
+        ]
 
     if limit is not None and limit < len(rows):
         rows = _sample(rows, limit) if spread else rows[:limit]
@@ -333,6 +374,7 @@ async def _call(
     relations: list[str],
     schema: dict[str, Any],
     max_tokens: int,
+    temperature: float | None,
 ) -> Completion:
     return await client.complete(
         model=settings.model,
@@ -340,6 +382,7 @@ async def _call(
         user=prompts.build_user_prompt(document, relations),
         schema=schema,
         max_tokens=max_tokens,
+        temperature=temperature,
     )
 
 
@@ -361,6 +404,18 @@ async def extract_all(
     )
     semaphore = asyncio.Semaphore(settings.concurrency)
 
+    # Asked once per run, not assumed. Sending a parameter the model does not
+    # advertise is fatal under `provider.require_parameters` -- it leaves no
+    # eligible endpoint, so every document fails in routing at zero cost.
+    supported = await client.supported_parameters(settings.model)
+    temperature = 0.0 if "temperature" in supported else None
+    if on_progress and temperature is None:
+        print(
+            f"  {settings.model} does not advertise `temperature`;"
+            f" sending the request without it",
+            flush=True,
+        )
+
     # Relations are read up front: SQLite reads during the async gather would
     # interleave with the writes below.
     relations = {d["document_number"]: known_relations(con, d["document_number"]) for d in documents}
@@ -370,13 +425,14 @@ async def extract_all(
             try:
                 completion = await _call(
                     client, settings, document, relations[document["document_number"]],
-                    schema, max_tokens,
+                    schema, max_tokens, temperature,
                 )
                 if completion.truncated:
                     # One retry with a higher cap before calling it invalid.
                     completion = await _call(
                         client, settings, document,
-                        relations[document["document_number"]], schema, max_tokens * 2,
+                        relations[document["document_number"]], schema,
+                        max_tokens * 2, temperature,
                     )
                 elif not _parses(completion.content):
                     # A malformed body -- truncated JSON, a bare array, or a
@@ -385,7 +441,8 @@ async def extract_all(
                     # recoverable by simply asking again.
                     completion = await _call(
                         client, settings, document,
-                        relations[document["document_number"]], schema, max_tokens,
+                        relations[document["document_number"]], schema,
+                        max_tokens, temperature,
                     )
                 return document, completion
             except Exception as exc:  # noqa: BLE001

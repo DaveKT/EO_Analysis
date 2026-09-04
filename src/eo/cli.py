@@ -13,6 +13,7 @@ from dataclasses import replace
 import typer
 
 from eo import __version__, db, dispositions, ingest, prompts
+from eo import compare as compare_mod
 from eo import extract as extract_mod
 from eo import validate as validate_mod
 from eo.config import API_KEY_VAR, Settings, load_settings
@@ -195,6 +196,11 @@ def extract(
     run_id: int = typer.Option(
         None, "--run-id", help="Resume an existing run, skipping what it already has."
     ),
+    compare_run: int = typer.Option(
+        None, "--compare-run",
+        help="Extract only the gold set plus what run N flagged, for a"
+             " frontier-model comparison against run N.",
+    ),
     model: str = typer.Option(None, "--model", help="Override the configured model."),
     concurrency: int = typer.Option(None, "--concurrency", help="Parallel requests."),
     max_tokens: int = typer.Option(None, "--max-tokens", help="Output cap per call."),
@@ -214,8 +220,17 @@ def extract(
     settings = replace(settings, **overrides)
 
     with db.session(settings.db_path) as con:
+        if compare_run is not None and not con.execute(
+            "SELECT 1 FROM extraction_runs WHERE run_id = ?", (compare_run,)
+        ).fetchone():
+            typer.secho(
+                f"no such run to compare against: {compare_run}",
+                fg=typer.colors.RED, err=True,
+            )
+            raise typer.Exit(code=2)
+
         selected = extract_mod.select_documents(
-            con, limit=limit, run_id=run_id, spread=spread
+            con, limit=limit, run_id=run_id, spread=spread, compare_run=compare_run
         )
         sendable, too_short = extract_mod.filter_extractable(selected)
 
@@ -234,6 +249,8 @@ def extract(
         typer.echo(f"model         {settings.model}")
         typer.echo(f"prompt        {prompts.PROMPT_VERSION}")
         typer.echo(f"documents     {len(sendable)}")
+        if compare_run is not None:
+            typer.echo(f"comparing to  run {compare_run} (gold set + its review queue)")
         typer.echo(f"input size    {chars:,} chars (~{chars // 4:,} tokens)")
         typer.echo(f"concurrency   {settings.concurrency}")
         typer.echo(f"max_tokens    {settings.max_tokens}")
@@ -250,7 +267,12 @@ def extract(
             return
 
         settings.require_api_key()
-        active_run = run_id or extract_mod.start_run(con, settings.model)
+        notes = (
+            f"frontier comparison against run {compare_run}"
+            if compare_run is not None
+            else None
+        )
+        active_run = run_id or extract_mod.start_run(con, settings.model, notes)
         typer.echo(f"run_id        {active_run}")
         typer.echo("")
 
@@ -277,13 +299,18 @@ def extract(
     typer.echo("")
     typer.echo(report.summary())
     _report_gates(gates)
-    if not gates.passed:
-        typer.secho("\nrun FAILED its quality gates.", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1)
+    # Failures are printed before the gate verdict is acted on. When every
+    # document fails, the gates fail too, and an early exit here would report
+    # "0% stored quotes verified" while swallowing the one line that says why
+    # -- which is how a routing 404 first presented as a quality problem.
     if report.failed:
         typer.secho(f"\n{len(report.failed)} failure(s):", fg=typer.colors.RED, err=True)
         for doc_num, reason in report.failed[:20]:
             typer.echo(f"  {doc_num}: {reason}", err=True)
+    if not gates.passed:
+        typer.secho("\nrun FAILED its quality gates.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+    if report.failed:
         raise typer.Exit(code=1)
 
 
@@ -366,6 +393,125 @@ def review(
 def export() -> None:
     """Export the dataset to CSV/Parquet."""
     _not_yet("export", "Phase 5")
+
+
+def _axis_block(axis: compare_mod.Axis, baseline: int, candidate: int) -> None:
+    typer.echo(
+        f"  {axis.name:<16} {axis.baseline_rate:>6.0%} {axis.candidate_rate:>8.0%}"
+        f"     {axis.baseline_hits}/{axis.n} vs {axis.candidate_hits}/{axis.n}"
+    )
+
+
+def _disagreement_lines(entries: list[tuple], indent: str = "      ") -> None:
+    for eo_number, title, truth, base_answer, cand_answer in entries:
+        typer.echo(f"{indent}EO {eo_number}  {(title or '')[:52]}")
+        typer.echo(
+            f"{indent}   gold={truth}  baseline={base_answer}  candidate={cand_answer}"
+        )
+
+
+@app.command()
+def compare(
+    baseline: int = typer.Option(..., "--baseline", help="The run to beat."),
+    candidate: int = typer.Option(..., "--candidate", help="The run under test."),
+) -> None:
+    """Compare two extraction runs over the documents they both cover."""
+    settings = load_settings()
+    with db.session(settings.db_path) as con:
+        try:
+            report = compare_mod.compare_runs(con, baseline, candidate)
+        except ValueError as exc:
+            typer.secho(str(exc), fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2) from exc
+
+    base, cand = report.baseline, report.candidate
+    if not report.documents:
+        typer.secho(
+            f"runs {baseline} and {candidate} share no successfully extracted"
+            " documents; nothing to compare.",
+            fg=typer.colors.RED, err=True,
+        )
+        raise typer.Exit(code=2)
+
+    typer.echo(
+        f"run {cand.run_id} {cand.model} vs run {base.run_id} {base.model}"
+    )
+    if base.prompt_version != cand.prompt_version:
+        typer.secho(
+            f"  prompt versions differ ({base.prompt_version} vs"
+            f" {cand.prompt_version}) — this compares prompt and model together,"
+            " not the model alone.",
+            fg=typer.colors.YELLOW,
+        )
+    else:
+        typer.echo(f"  prompt {base.prompt_version} in both")
+    typer.echo(f"  {len(report.documents)} documents extracted by both runs")
+    typer.echo("")
+
+    typer.echo(f"gold-set agreement ({report.gold_orders} hand-labelled orders)")
+    typer.echo(f"  {'':<16} {'baseline':>6} {'candidate':>8}")
+    for axis in report.axes:
+        _axis_block(axis, baseline, candidate)
+    typer.echo("")
+
+    for axis in report.axes:
+        if axis.both_wrong:
+            typer.secho(
+                f"  {axis.name}: both models disagree with the label on"
+                f" {len(axis.both_wrong)} order(s).",
+                fg=typer.colors.YELLOW,
+            )
+            typer.echo(
+                "    Two independent models reading the same text the same way is"
+            )
+            typer.echo(
+                "    evidence about the label, which nothing else checks. Review these:"
+            )
+            _disagreement_lines(axis.both_wrong)
+        if axis.candidate_only_wrong:
+            typer.echo(
+                f"  {axis.name}: only the candidate disagrees on"
+                f" {len(axis.candidate_only_wrong)} order(s)"
+            )
+            _disagreement_lines(axis.candidate_only_wrong)
+        if axis.baseline_only_wrong:
+            typer.echo(
+                f"  {axis.name}: only the baseline disagrees on"
+                f" {len(axis.baseline_only_wrong)} order(s)"
+            )
+            _disagreement_lines(axis.baseline_only_wrong)
+    typer.echo("")
+
+    typer.echo(f"model-vs-model agreement over all {len(report.documents)} documents")
+    for name, (agree, total, _) in report.field_agreement.items():
+        rate = agree / total if total else 0.0
+        typer.echo(f"  {name:<16} {agree:>3}/{total:<3} {rate:>6.0%}")
+    typer.echo("")
+
+    base_g, cand_g = report.grounding[baseline], report.grounding[candidate]
+    typer.echo("quote grounding over the same documents")
+    typer.echo(f"  {'':<16} {'baseline':>8} {'candidate':>9}")
+    typer.echo(f"  {'quotes':<16} {base_g.checked:>8} {cand_g.checked:>9}")
+    typer.echo(
+        f"  {'grounded':<16} {base_g.rate:>8.1%} {cand_g.rate:>9.1%}"
+    )
+    typer.echo(
+        f"  {'severe drift':<16} {base_g.severe_rate:>8.1%} {cand_g.severe_rate:>9.1%}"
+    )
+    typer.echo("")
+
+    typer.echo("claims extracted (a model that scores well by saying less is not better)")
+    typer.echo(f"  {'':<20} {'baseline':>8} {'candidate':>9}")
+    for table in sorted(report.claims[baseline]):
+        typer.echo(
+            f"  {table:<20} {report.claims[baseline][table]:>8}"
+            f" {report.claims[candidate][table]:>9}"
+        )
+    typer.echo("")
+    typer.echo(
+        f"cost   run {base.run_id} ${base.cost_usd:.4f} over {base.rows} rows"
+        f"   |   run {cand.run_id} ${cand.cost_usd:.4f} over {cand.rows} rows"
+    )
 
 
 def main() -> None:

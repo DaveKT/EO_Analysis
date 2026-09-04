@@ -53,7 +53,17 @@ eo fetch      # Phase 1: ingest from the Federal Register (free, no model calls)
 eo extract    # Phase 3: the LLM pass
 eo validate   # Phase 4: quality gates
 eo review     # Phase 4: what the gates parked for human review
+eo compare    # two runs, head to head over the documents both cover
 eo export     # Phase 5: CSV/Parquet                       (not yet implemented)
+```
+
+Comparing two models is a first-class operation, not a one-off script, because
+a single run's gate report cannot distinguish the model's ceiling from the
+task's:
+
+```sh
+eo extract --compare-run 9 --model openai/gpt-5.4   # gold set + what run 9 flagged
+eo compare --baseline 9 --candidate 10
 ```
 
 `eo fetch` is idempotent and resumable at two levels: documents already stored
@@ -160,6 +170,52 @@ from source, spanning all six presidencies, including the shortest order in the
 corpus and the longest in the sample. It is the only gate that can catch a model
 that is fluent and confidently wrong about what an order *is*; groundedness
 proves quotes are real, not that the reading is right.
+
+## How good is the cheap model, really
+
+A single run's gate report cannot tell whether 80% topic agreement is the
+*model's* ceiling or the *task's*. Answering that takes a second run, so 36
+orders — the 20 gold labels plus the 23 documents run 9 flagged for review, less
+overlap — were re-extracted on `openai/gpt-5.4` under the identical prompt (v7).
+`eo compare --baseline 9 --candidate 10` reports it.
+
+| Measured over the same 36 documents | `gpt-oss-120b` | `gpt-5.4` |
+|---|---|---|
+| gold: primary_topic | 80% (16/20) | **100% (20/20)** |
+| gold: instrument | 85% (17/20) | 80% (16/20) |
+| groundedness, as the model wrote it | 88.6% | **99.8%** |
+| severe quote drift | 3.7% | **0.0%** |
+| quotes extracted | 245 | 531 |
+| agencies tasked / authorities | 74 / 37 | 248 / 145 |
+| cost | $0.02 | $0.85 |
+
+**Topic agreement was the cheap model's ceiling, not the task's.** All four of
+its topic misses were the same failure — defaulting to `government_administration`
+or `foreign_policy` where a specific domain applied (EO 13985 civil rights,
+EO 14105 economy, EO 13115 and EO 14167 security). The frontier model missed none.
+
+It also extracts **more than twice as many claims while being more grounded**,
+which rules out the obvious confound: it is not scoring well by saying less.
+The one place it does less is relationships (46 → 30).
+
+Two honest caveats:
+
+- The 88.6% baseline groundedness here is **not** the 94.8% quoted above. This
+  36-document set is deliberately enriched with run 9's own failures, so no rate
+  measured over it is comparable to a rate over a random sample. Only the
+  head-to-head columns are comparable, because both runs cover the same documents.
+- **Instrument agreement did not improve, and that points at the labels.** Three
+  orders are labelled differently by *both* models, independently: EO 13489,
+  EO 14081, EO 14287. Two independent models reading the same text the same way
+  is evidence about the label, which nothing else checks. EO 14081 is the clear
+  case — it establishes a "Data for the Bioeconomy Initiative" and a national
+  Initiative, both models call that `creates_body`, and the gold convention's
+  precedence rule never says whether a *program* counts as a *body*. The rule is
+  underspecified, not merely misapplied.
+
+The cheap sweep remains the plan of record for the full corpus (~$1.00 against
+~$36 for `gpt-5.4`), with the topic-agreement gap recorded here rather than
+smoothed over.
 
 ## What went wrong in v1, and what prevents it now
 
