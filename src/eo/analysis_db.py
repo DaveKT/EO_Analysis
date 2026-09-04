@@ -35,6 +35,8 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from eo import agencies
+
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
@@ -157,6 +159,31 @@ CREATE TABLE raw_quotes (
   UNIQUE (claim_table, claim_id)
 );
 
+-- Canonical agencies. `agency_name` on the claim stays exactly as extracted,
+-- because it is what the source quote supports; this is the resolved identity
+-- beside it. `matched` records whether the alias table recognised the name or
+-- the cleaned surface form became its own entity -- so the mapping's coverage
+-- is queryable rather than assumed.
+CREATE TABLE agencies (
+  agency_id      INTEGER PRIMARY KEY,
+  canonical_name TEXT NOT NULL UNIQUE,
+  kind           TEXT NOT NULL,   -- department|office|official|collective|body
+  matched        INTEGER NOT NULL,
+  note           TEXT
+);
+
+-- A claim can name several agencies ("Attorney General and Secretary of
+-- Homeland Security"), so this is many-to-many rather than a column on the
+-- claim. Counting taskings per agency means counting rows here.
+CREATE TABLE agency_mentions (
+  id          INTEGER PRIMARY KEY,
+  claim_table TEXT NOT NULL,     -- 'agencies_tasked' | 'deadlines'
+  claim_id    INTEGER NOT NULL,
+  agency_id   INTEGER NOT NULL REFERENCES agencies (agency_id),
+  raw_name    TEXT NOT NULL,
+  UNIQUE (claim_table, claim_id, agency_id)
+);
+
 CREATE TABLE review_queue (
   id              INTEGER PRIMARY KEY,
   document_number TEXT NOT NULL REFERENCES orders (document_number),
@@ -177,6 +204,8 @@ CREATE INDEX idx_rel_doc ON relationships (document_number);
 CREATE INDEX idx_rel_target ON relationships (target_document_number);
 CREATE INDEX idx_rel_relation ON relationships (relation);
 CREATE INDEX idx_review_doc ON review_queue (document_number);
+CREATE INDEX idx_mentions_agency ON agency_mentions (agency_id);
+CREATE INDEX idx_mentions_claim ON agency_mentions (claim_table, claim_id);
 
 -- Convenience views. The revocation network is the join most likely to be got
 -- subtly wrong by hand: it needs both endpoints resolved to real orders.
@@ -190,6 +219,23 @@ FROM relationships r
 JOIN orders src ON src.document_number = r.document_number
 JOIN orders tgt ON tgt.document_number = r.target_document_number
 WHERE r.relation IN ('revokes', 'amends', 'supersedes', 'continues');
+
+-- Taskings per canonical agency, already joined to the order. This is the view
+-- to count with: doing it from agencies_tasked.agency_name splits the Treasury
+-- across "Secretary of the Treasury" and "Department of the Treasury".
+CREATE VIEW agency_taskings AS
+SELECT ag.agency_id, ag.canonical_name, ag.kind, ag.matched,
+       m.claim_table, m.claim_id, m.raw_name,
+       o.document_number, o.eo_number, o.president, o.signing_date,
+       o.primary_topic, o.instrument
+FROM agency_mentions m
+JOIN agencies ag USING (agency_id)
+JOIN (
+    SELECT 'agencies_tasked' AS claim_table, id, document_number FROM agencies_tasked
+    UNION ALL
+    SELECT 'deadlines', id, document_number FROM deadlines
+) c ON c.claim_table = m.claim_table AND c.id = m.claim_id
+JOIN orders o ON o.document_number = c.document_number;
 
 -- Every claim in one shape, for counting or for finding an order's whole
 -- evidence trail without four separate queries.
@@ -215,6 +261,63 @@ CLAIM_TABLES = ("agencies_tasked", "deadlines", "authorities", "relationships")
 
 def _rows(con: sqlite3.Connection, sql: str, params: dict) -> list[sqlite3.Row]:
     return con.execute(sql, params).fetchall()
+
+
+def _resolve_agencies(out: sqlite3.Connection) -> dict[str, int]:
+    """Populate `agencies` and `agency_mentions` from the names as extracted.
+
+    Runs over both `agencies_tasked.agency_name` and
+    `deadlines.responsible_party`: they carry the same names and the same
+    Secretary/Department split, and normalising only one of them would leave the
+    other quietly wrong.
+    """
+    sources = (
+        ("agencies_tasked", "SELECT id, agency_name AS raw FROM agencies_tasked"),
+        (
+            "deadlines",
+            (
+                "SELECT id, responsible_party AS raw FROM deadlines"
+                " WHERE responsible_party IS NOT NULL"
+                " AND TRIM(responsible_party) <> ''"
+            ),
+        ),
+    )
+    ids: dict[str, int] = {}
+    mentions: list[tuple[str, int, int, str]] = []
+    rows: list[tuple[int, str, str, int, str | None]] = []
+
+    for claim_table, sql in sources:
+        for row in out.execute(sql).fetchall():
+            names, matched = agencies.resolve(row["raw"])
+            for name in names:
+                if name not in ids:
+                    ids[name] = len(ids) + 1
+                    note = (
+                        agencies.DEFENSE_NOTE
+                        if name in ("Department of War", "Department of Defense")
+                        else None
+                    )
+                    rows.append(
+                        (ids[name], name, agencies.kind_of(name), int(matched), note)
+                    )
+                mentions.append((claim_table, row["id"], ids[name], row["raw"]))
+
+    out.executemany(
+        "INSERT INTO agencies (agency_id, canonical_name, kind, matched, note)"
+        " VALUES (?,?,?,?,?)",
+        rows,
+    )
+    out.executemany(
+        "INSERT OR IGNORE INTO agency_mentions (claim_table, claim_id, agency_id,"
+        " raw_name) VALUES (?,?,?,?)",
+        mentions,
+    )
+    return {
+        "agencies": len(rows),
+        "agency_mentions": out.execute(
+            "SELECT COUNT(*) FROM agency_mentions"
+        ).fetchone()[0],
+    }
 
 
 def build(
@@ -429,6 +532,8 @@ def build(
         ],
     )
     counts["review_queue"] = len(review)
+
+    counts.update(_resolve_agencies(out))
 
     out.execute(
         "INSERT INTO run_metadata (run_id, model, prompt_version, started_at,"

@@ -76,10 +76,13 @@ authorities          1,707  id PK -> orders
 relationships        5,765  id PK -> orders, target_document_number -> orders
 raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
 review_queue           866  id PK -> orders
+agencies               622  canonical agencies
+agency_mentions      5,785  (claim_table, claim_id) -> agencies, many-to-many
 ```
 
-Two views come with it: `revocation_network` (both endpoints already resolved to
-real orders) and `all_claims` (every quoted claim in one shape).
+Three views come with it: `revocation_network` (both endpoints already resolved
+to real orders), `agency_taskings` (canonical agencies joined to their orders)
+and `all_claims` (every quoted claim in one shape).
 
 ```sql
 -- who revokes whom, across administrations
@@ -107,8 +110,62 @@ Three things to know before writing queries against it:
   point at pre-1994 orders outside the Federal Register's full-text coverage.
   `target_eo_number` is still populated, so an unresolvable target is visibly
   unresolvable rather than a join that silently drops rows.
-- **Agency names are not normalised.** `Secretary of the Treasury` and
-  `Department of the Treasury` are distinct rows.
+- **Count agencies through `agency_taskings`, not `agencies_tasked.agency_name`.**
+  See below.
+
+### Agency normalisation
+
+The extraction records agencies as each order names them — which is correct, since
+the `source_quote` has to match the text — but that left 1,146 distinct names over
+3,195 taskings, with `Secretary of the Treasury` (91) and `Department of the
+Treasury` (66) as separate entities. `agencies` + `agency_mentions` resolve them to
+**622 canonical entities**, covering **78% of mentions** by the alias table.
+
+```sql
+SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
+FROM agency_taskings WHERE kind <> 'collective'
+GROUP BY agency_id ORDER BY taskings DESC LIMIT 10;
+```
+
+| Agency | Taskings | Orders |
+|---|---|---|
+| Department of Homeland Security | 357 | 115 |
+| Department of Health and Human Services | 295 | 96 |
+| Department of Justice | 293 | 119 |
+| Department of Commerce | 267 | 101 |
+| Department of the Treasury | 267 | 144 |
+| Department of State | 247 | 115 |
+| Department of Defense | 205 | 94 |
+| Office of Management and Budget | 196 | 104 |
+
+Four rules govern the mapping, each because the obvious approach is wrong:
+
+- **`agency_name` is never overwritten.** It stays exactly as extracted, because
+  it is what the source quote supports. Canonical names sit beside it, so a
+  disagreement with this mapping is visible and fixable without re-extracting.
+- **Resolution is alias lookup, not splitting on "and".** A row can name several
+  agencies (`Attorney General and Secretary of Homeland Security` → both), but
+  splitting on conjunctions would destroy `Health and Human Services`. Names are
+  scanned longest-alias-first instead. `agency_mentions` is many-to-many, so a
+  compound row credits every agency it names.
+- **An unrecognised name becomes its own entity, never a bucket.** Most of the
+  long tail is real — one-off commissions, task forces, boards — and should stay
+  countable. `agencies.matched` records whether the alias table recognised a name,
+  so coverage is queryable rather than assumed.
+- **A qualifier is not noise.** `each federal agency` resolves to the collective;
+  `all contracting agencies` does not, because it names a subset and merging it
+  would claim the whole executive branch was tasked.
+
+`Secretary of X` and `Department of X` are deliberately merged — one institution
+for the purpose of counting. **`Department of War` is deliberately not merged into
+`Department of Defense`**: EO 14347 (2025-09-05) renamed it, and collapsing them
+would erase a real change on nothing but an assumption. They appear as separate
+canonical agencies (205 and 54 taskings) with the rename recorded in
+`agencies.note`; join on both to count the institution as one.
+
+`deadlines.responsible_party` is normalised by the same rules — it carries the
+same names and the same split, and doing only one table would leave the other
+quietly wrong.
 
 ### Flat files
 

@@ -220,3 +220,62 @@ def test_rebuild_replaces_rather_than_appends(source, tmp_path):
 def test_unknown_run_is_an_error(source, tmp_path):
     with pytest.raises(ValueError, match="no such run"):
         analysis_db.build(source, tmp_path / "x.db", 99)
+
+
+def test_agency_names_are_normalised_across_both_tables(source, tmp_path):
+    """Secretary/Department variants must collapse, and `responsible_party` on
+    deadlines must be normalised too -- doing only one leaves the other wrong."""
+    source.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote) VALUES ('doc-101', 1, 'Department of Commerce', 't',"
+        " 'the Secretary of Commerce')"
+    )
+    source.execute(
+        "INSERT INTO deadlines (document_number, run_id, due_description,"
+        " responsible_party, source_quote) VALUES ('doc-101', 1, 'report',"
+        " 'Secretary of Commerce', 'the Secretary of Commerce')"
+    )
+    source.commit()
+    path = tmp_path / "a.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+
+    rows = con.execute(
+        "SELECT claim_table, raw_name FROM agency_taskings"
+        " WHERE canonical_name = 'Department of Commerce' ORDER BY claim_table"
+    ).fetchall()
+    assert [r["claim_table"] for r in rows] == ["agencies_tasked", "deadlines"]
+    # Two different raw spellings, one canonical agency.
+    assert {r["raw_name"] for r in rows} == {
+        "Department of Commerce", "Secretary of Commerce"
+    }
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+    con.close()
+
+
+def test_raw_agency_name_is_never_overwritten(built):
+    con, _, _ = built
+    assert con.execute(
+        "SELECT agency_name FROM agencies_tasked"
+    ).fetchone()[0] == "Commerce"
+
+
+def test_a_compound_agency_row_credits_every_agency_named(source, tmp_path):
+    source.execute(
+        "INSERT INTO agencies_tasked (document_number, run_id, agency_name, task,"
+        " source_quote) VALUES ('doc-101', 1,"
+        " 'Attorney General and Secretary of Homeland Security', 't', 'q')"
+    )
+    source.commit()
+    path = tmp_path / "b.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    names = {
+        r[0]
+        for r in con.execute(
+            "SELECT canonical_name FROM agency_taskings WHERE raw_name LIKE 'Attorney%'"
+        )
+    }
+    assert names == {"Department of Justice", "Department of Homeland Security"}
+    con.close()
