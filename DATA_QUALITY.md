@@ -274,10 +274,15 @@ unrelated orders and produce a confidently wrong ranking. **Exclude them from an
 cross-order aggregate:**
 
 ```sql
-SELECT canonical_name, COUNT(*) FROM agency_taskings
+SELECT canonical_name, COUNT(DISTINCT document_number) AS orders
+FROM agency_taskings
 WHERE kind NOT IN ('generic', 'collective')
-GROUP BY agency_id ORDER BY 2 DESC;
+GROUP BY agency_id ORDER BY orders DESC;
 ```
+
+**A row count over `agency_taskings` double-counts.** The view unions agency
+taskings with deadline responsibilities, and 30% of (agency, order) pairs appear
+in both — the same obligation recorded twice. Rank by distinct orders.
 
 Judgment calls baked in, which you may disagree with:
 - `Secretary of X` and `Department of X` are merged as one institution.
@@ -355,7 +360,9 @@ A checklist for not overstating what is here.
    the orders. See §6.2.
 3. **Quote `source_quote`, not `summary`.** Only the former is verified.
 4. **Count agencies through `agency_taskings`**, never
-   `agencies_tasked.agency_name` — the latter splits Treasury three ways.
+   `agencies_tasked.agency_name` — the latter splits Treasury three ways. Rank by
+   `COUNT(DISTINCT document_number)`, not row count, and exclude
+   `kind IN ('collective', 'generic')`. See the cheat sheet.
 5. **State that ~21% of relationship targets do not resolve** if you present the
    revocation network.
 6. **Say "parseable deadlines"** if you quote deadline medians.
@@ -385,5 +392,6 @@ PYTHONPATH=src .venv/bin/python -m pytest -q                     # 148 tests
 SELECT COUNT(*) FROM all_claims c JOIN order_text t USING (document_number);
 ```
 
-Related: [PLAN.md](PLAN.md) for how the project got here and what is still open;
+Related: **[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** for the
+one-page version of these caveats; [PLAN.md](PLAN.md) for how the project got here and what is still open;
 [DATA_DICTIONARY.md](DATA_DICTIONARY.md) for the schema.

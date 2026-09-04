@@ -12,9 +12,16 @@ The development plan is [PLAN.md](PLAN.md). The v1 attempt is preserved in
 
 | | |
 |---|---|
+| Start querying | **[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** — one page of the traps that will bite you. *Read this first.* |
 | Do analysis | [DATA_DICTIONARY.md](DATA_DICTIONARY.md) — schema, ERD, worked joins for `data/analysis.db` |
-| Know what to trust | **[DATA_QUALITY.md](DATA_QUALITY.md)** — every control, finding and caveat. *Read before quoting a number.* |
+| Know what to trust | [DATA_QUALITY.md](DATA_QUALITY.md) — every control, finding and caveat |
 | Understand the build | [PLAN.md](PLAN.md) — phase status, decisions, what is still open |
+
+**The data is published in this repository.** `data/analysis.db` (23 MB) and
+`data/export/` (4 MB of CSV) are committed — everything in them derives from the
+Federal Register, which is public domain. The working store (`data/eo.db`, every
+run and every raw model response) and the raw-text cache stay local; both are
+rebuildable.
 
 ## Coverage boundary
 

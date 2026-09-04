@@ -1,7 +1,13 @@
 .venv
 __pycache__
 *.pdf
-data/
+# The working store stays local: eo.db holds every run and every raw model
+# response, and data/raw/ is a re-fetchable cache. The two published artefacts
+# are the analysis database and the flat-file export -- both derived from public
+# Federal Register data, both rebuildable with `eo analysis-db` / `eo export`.
+data/*
+!data/analysis.db
+!data/export/
 .env
 my_secrets.py
 .DS_Store

@@ -8,7 +8,9 @@ rate gate fails at 7.3%, which is a recorded finding, not an open defect.
 Written 2026-09-03; updated 2026-09-04 when the data side closed.
 **Read this first if you are a fresh session picking up the work.**
 
-Three companion documents carry what this plan does not:
+Four companion documents carry what this plan does not:
+**[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** is the one-page
+list of traps — *the first thing to read before querying*;
 [README.md](README.md) is how to run it and what the dataset shows;
 **[DATA_QUALITY.md](DATA_QUALITY.md)** is every control, finding and caveat —
 *read it before quoting any number*;
@@ -32,7 +34,8 @@ Three companion documents carry what this plan does not:
 | 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
 | 5b Export | done | `eo export` (CSV) and `eo analysis-db` (SQLite) |
 | 5c Agency normalisation | done | 1,146 raw names -> 558 canonical, 83% matched |
-| 5d Documentation | done | `DATA_QUALITY.md`, `DATA_DICTIONARY.md` + ERD |
+| 5d Documentation | done | quality, dictionary + ERD, cheat sheet |
+| 5f Publication | done | `data/analysis.db` + `data/export/` committed |
 | 5e Notebook | deferred | by decision; findings are in the README |
 | 6 Analysis | **next** | the user's own work, against `data/analysis.db` |
 | 7 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
@@ -50,7 +53,13 @@ Three companion documents carry what this plan does not:
 - Run 11 holds all 1,534 orders: 3,195 agencies tasked, 2,240 deadlines, 1,707
   authorities, 1,847 model-found relationships, 866 review-queue items.
 
-### The shipped artefacts (both gitignored, both rebuildable)
+### The shipped artefacts (both committed to the repository)
+
+Published 2026-09-04: everything in them derives from the Federal Register and is
+public domain. The working store (`data/eo.db`) and the raw-text cache stay
+local and gitignored -- they hold every run and every raw model response, and
+both are rebuildable. A Datasette front end over `analysis.db` is a later
+possibility, so that others can check the analysis.
 
 - **`data/analysis.db`** (23.7 MB) -- the thing to do analysis against. Run 11
   plus its source text, normalised and keyed; 12 tables, 3 views, foreign keys

@@ -11,7 +11,9 @@ PYTHONPATH=src .venv/bin/python -m eo.cli analysis-db --run-id 11
 `PRAGMA foreign_key_check` runs at build time, so a build that would leave a
 dangling reference fails instead of writing.
 
-Read [DATA_QUALITY.md](DATA_QUALITY.md) before drawing conclusions from any of it.
+Read [DATA_QUALITY.md](DATA_QUALITY.md) before drawing conclusions from any of it,
+and **[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** before writing
+your first query — four of the obvious ones are wrong by default.
 
 ---
 
@@ -372,14 +374,20 @@ tables, quote trimmed), `relationship` 63 (model contradicted FR),
 **Count agencies with this, not with `agencies_tasked.agency_name`** — the latter
 splits Treasury across `Secretary of the Treasury` and `Department of the
 Treasury`. Joins `agency_mentions` → `agencies` → the claim → `orders`, so every
-row carries president, date, topic and instrument.
+row carries president, date, topic and instrument. 5,863 rows.
+
+> **Rank by `COUNT(DISTINCT document_number)`, not by row count.** The view
+> unions two claim types — `agencies_tasked` (3,627 rows) and `deadlines` (2,236)
+> — and **30% of (agency, order) pairs appear in both**, so a row count records
+> the same obligation twice. Filter `claim_table` if you want one kind only, and
+> exclude `kind IN ('collective', 'generic')`, which are not cross-order entities.
 
 ```sql
--- exclude 'collective' ("all federal agencies") and 'generic' ("Task Force"),
--- which are not cross-order entities
-SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
+SELECT canonical_name,
+       COUNT(DISTINCT document_number) AS orders,
+       COUNT(*) AS mentions
 FROM agency_taskings WHERE kind NOT IN ('collective', 'generic')
-GROUP BY agency_id ORDER BY taskings DESC LIMIT 10;
+GROUP BY agency_id ORDER BY orders DESC LIMIT 10;
 ```
 
 ### `revocation_network`
@@ -424,8 +432,8 @@ SELECT president, instrument, COUNT(*) n
 FROM orders GROUP BY 1, 2 ORDER BY president, n DESC;
 
 -- which agencies a given president tasked most
-SELECT canonical_name, COUNT(*) n FROM agency_taskings
-WHERE president = 'Barack Obama' AND kind <> 'collective'
+SELECT canonical_name, COUNT(DISTINCT document_number) n FROM agency_taskings
+WHERE president = 'Barack Obama' AND kind NOT IN ('collective', 'generic')
 GROUP BY agency_id ORDER BY n DESC LIMIT 10;
 
 -- the Department of War period, recovered after the merge into Defense
