@@ -90,6 +90,8 @@ erDiagram
         TEXT source
         TEXT source_quote
         TEXT fr_disposition_note
+        INTEGER authoritative
+        INTEGER superseded_by FK
     }
     agencies {
         INTEGER agency_id PK
@@ -276,12 +278,22 @@ What an order does to other orders. **Two sources with different evidence.**
 | `source_quote` | TEXT | 68% | **model rows only** — verbatim from the order |
 | `fr_disposition_note` | TEXT | 32% | **FR rows only** — an editorial note *about* the order |
 | `quote_trimmed` | INTEGER | — | as above |
+| `authoritative` | INTEGER | — | **1 = count this row.** 0 when a Federal Register row covers the same (order, target) pair |
+| `superseded_by` | INTEGER | — | FK → `relationships.id`, the FR row that outranks this one |
+| `contradicts_fr` | INTEGER | — | 1 where a superseded model row asserts a *different* relation (174 rows) |
 
 `relation`: `amends`, `amended_by`, `continues`, `continued_by`, `references`,
 `rescinds`, `rescinded_by`, `revokes`, `revoked_by`, `supersedes`, `superseded_by`,
 `supplements`, `supplemented_by`, `suspends`, `suspended_by`. The `_by` forms are
 inbound and come only from Federal Register notes — an order's own text cannot
 assert what a later order will do to it.
+
+> **Filter on `authoritative = 1` when counting.** The Federal Register is the
+> authoritative record of what an order does to earlier orders, so where FR and
+> the model both cover a pair, the FR row wins and the model's is marked 0 —
+> including when they agree. 3,918 FR edges + 930 model edges on pairs FR is
+> silent about are authoritative; 917 model edges are superseded. Counting all
+> 5,765 inflates the revocation network by 27%.
 
 > **The `source_quote` / `fr_disposition_note` split matters.** `source_quote`
 > always means verbatim text from that order. Federal Register rows carry no
@@ -370,12 +382,13 @@ GROUP BY agency_id ORDER BY taskings DESC LIMIT 10;
 
 ### `revocation_network`
 
-Relationship edges with **both endpoints resolved to real orders**, so it is safe
-to group by president. Filtered to `revokes`, `amends`, `supersedes`, `continues`.
-1,310 rows. Note this excludes the ~21% of edges whose target is outside the
-corpus.
+Relationship edges with **both endpoints resolved to real orders** and
+**`authoritative = 1`**, so it is safe to group by president and each edge counts
+once. Filtered to `revokes`, `amends`, `supersedes`, `continues`. **850 rows.**
+Excludes the ~21% of edges whose target is outside the corpus.
 
 ```sql
+-- already deduplicated: the view filters to authoritative = 1
 SELECT source_president, target_president, COUNT(*)
 FROM revocation_network WHERE relation = 'revokes'
 GROUP BY 1, 2 ORDER BY 3 DESC;

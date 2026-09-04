@@ -310,3 +310,96 @@ def test_the_war_rename_is_recoverable_from_raw_names(source, tmp_path):
     ).fetchone()[0]
     assert "14347" in note and "raw_name" in note
     con.close()
+
+
+def test_federal_register_outranks_the_model_even_when_they_agree(source, tmp_path):
+    """The common case, and the one that quietly inflates counts: FR and the
+    model assert the same edge, and counting both double-counts it."""
+    source.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1, 'revokes',"
+        " 100, 'model', 'Executive Order 100 is revoked')"
+    )
+    source.commit()  # doc-101 already has an identical FR 'revokes 100' edge
+    path = tmp_path / "fr.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+
+    rows = con.execute(
+        "SELECT source, authoritative, superseded_by, contradicts_fr"
+        " FROM relationships WHERE relation = 'revokes' AND target_eo_number = 100"
+        " ORDER BY source"
+    ).fetchall()
+    fr, model = rows[0], rows[-1]
+    assert fr["source"] == "fr_disposition_notes" and fr["authoritative"] == 1
+    assert model["source"] == "model" and model["authoritative"] == 0
+    assert model["superseded_by"] == con.execute(
+        "SELECT id FROM relationships WHERE source = 'fr_disposition_notes'"
+        " AND target_eo_number = 100"
+    ).fetchone()[0]
+    # Agreement is not a contradiction.
+    assert model["contradicts_fr"] == 0
+    con.close()
+
+
+def test_a_model_edge_fr_says_nothing_about_is_kept(source, tmp_path):
+    """Finding edges FR missed is the point of extracting them."""
+    source.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1,"
+        " 'references', 555, 'model', 'the Secretary of Commerce')"
+    )
+    source.commit()
+    path = tmp_path / "fr2.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    row = con.execute(
+        "SELECT authoritative, superseded_by FROM relationships"
+        " WHERE target_eo_number = 555"
+    ).fetchone()
+    assert row == (1, None)
+    con.close()
+
+
+def test_a_contradiction_is_marked_not_deleted(source, tmp_path):
+    source.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1, 'amends',"
+        " 100, 'model', 'Executive Order 100 is revoked')"
+    )
+    source.commit()  # FR says 'revokes 100'; the model says 'amends'
+    path = tmp_path / "fr3.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+    row = con.execute(
+        "SELECT authoritative, contradicts_fr FROM relationships"
+        " WHERE source = 'model' AND relation = 'amends'"
+        "   AND target_eo_number = 100"
+    ).fetchone()
+    assert row["authoritative"] == 0
+    assert row["contradicts_fr"] == 1
+    con.close()
+
+
+def test_revocation_network_counts_each_edge_once(source, tmp_path):
+    source.execute(
+        "INSERT INTO relationships (document_number, run_id, relation,"
+        " target_eo_number, source, source_quote) VALUES ('doc-101', 1, 'revokes',"
+        " 100, 'model', 'Executive Order 100 is revoked')"
+    )
+    source.execute(
+        "INSERT INTO extractions (document_number, run_id, summary, primary_topic,"
+        " instrument, secondary_topics, finish_reason) VALUES ('doc-100', 1, 's',"
+        " 'health', 'creates_body', '[]', 'stop')"
+    )
+    source.commit()
+    path = tmp_path / "fr4.db"
+    analysis_db.build(source, path, 1)
+    con = sqlite3.connect(path)
+    total = con.execute(
+        "SELECT COUNT(*) FROM revocation_network WHERE relation = 'revokes'"
+    ).fetchone()[0]
+    assert total == 1, "FR and model both assert this edge; it must count once"
+    con.close()

@@ -145,7 +145,16 @@ CREATE TABLE relationships (
   source                 TEXT NOT NULL,
   source_quote           TEXT,          -- model rows only; verbatim from body_text
   fr_disposition_note    TEXT,          -- Federal Register rows only
-  quote_trimmed          INTEGER NOT NULL DEFAULT 0
+  quote_trimmed          INTEGER NOT NULL DEFAULT 0,
+  -- The Federal Register is authoritative. Where FR and the model both speak to
+  -- the same (order, target) pair, the FR row is the one to count and the model
+  -- row is marked superseded -- whether the two agree or contradict. Counting
+  -- both inflated the revocation network by 27%, because 123 revocation pairs
+  -- are asserted by both. Nothing is deleted: the model's row stays, with
+  -- superseded_by naming the FR row that outranks it.
+  authoritative          INTEGER NOT NULL DEFAULT 1,
+  superseded_by          INTEGER REFERENCES relationships (id),
+  contradicts_fr         INTEGER NOT NULL DEFAULT 0
 );
 
 -- What the model originally wrote, where the stored quote had to be trimmed to
@@ -218,7 +227,8 @@ SELECT r.relation,
 FROM relationships r
 JOIN orders src ON src.document_number = r.document_number
 JOIN orders tgt ON tgt.document_number = r.target_document_number
-WHERE r.relation IN ('revokes', 'amends', 'supersedes', 'continues');
+WHERE r.relation IN ('revokes', 'amends', 'supersedes', 'continues')
+  AND r.authoritative = 1;
 
 -- Taskings per canonical agency, already joined to the order. This is the view
 -- to count with: doing it from agencies_tasked.agency_name splits the Treasury
@@ -261,6 +271,67 @@ CLAIM_TABLES = ("agencies_tasked", "deadlines", "authorities", "relationships")
 
 def _rows(con: sqlite3.Connection, sql: str, params: dict) -> list[sqlite3.Row]:
     return con.execute(sql, params).fetchall()
+
+
+def _apply_fr_precedence(out: sqlite3.Connection) -> dict[str, int]:
+    """Let the Federal Register win wherever it has an opinion.
+
+    FR disposition notes are the authoritative record of what an order does to
+    earlier orders; the model's job is to *add* to them, not to restate or
+    contest them. So for any (order, target) pair FR speaks to, the FR row is
+    authoritative and the model's row is marked superseded -- including when the
+    two agree, which is the common case and the one that quietly inflates
+    counts. 123 revocation pairs are asserted by both sources; counting both
+    overstated the revocation network by 27%.
+
+    Model rows on pairs FR says nothing about stay authoritative: finding edges
+    FR missed is the point of extracting them.
+
+    Nothing is deleted. `superseded_by` names the winning FR row, and
+    `contradicts_fr` marks the subset where the model asserted a *different*
+    relation -- the disagreements worth a human's attention.
+    """
+    out.execute(
+        """
+        UPDATE relationships AS m
+           SET authoritative = 0,
+               superseded_by = (
+                 SELECT fr.id FROM relationships fr
+                  WHERE fr.source = 'fr_disposition_notes'
+                    AND fr.document_number = m.document_number
+                    AND fr.target_eo_number = m.target_eo_number
+                  ORDER BY fr.id LIMIT 1
+               )
+         WHERE m.source = 'model'
+           AND m.target_eo_number IS NOT NULL
+           AND EXISTS (
+                 SELECT 1 FROM relationships fr
+                  WHERE fr.source = 'fr_disposition_notes'
+                    AND fr.document_number = m.document_number
+                    AND fr.target_eo_number = m.target_eo_number
+               )
+        """
+    )
+    out.execute(
+        """
+        UPDATE relationships AS m
+           SET contradicts_fr = 1
+         WHERE m.source = 'model' AND m.superseded_by IS NOT NULL
+           AND m.relation <> (
+                 SELECT fr.relation FROM relationships fr
+                  WHERE fr.id = m.superseded_by
+               )
+        """
+    )
+    out.commit()
+    return {
+        "relationships superseded by FR": out.execute(
+            "SELECT COUNT(*) FROM relationships WHERE authoritative = 0"
+        ).fetchone()[0],
+        "  of which contradict FR": out.execute(
+            "SELECT COUNT(*) FROM relationships WHERE contradicts_fr = 1"
+        ).fetchone()[0],
+    }
 
 
 def _resolve_agencies(out: sqlite3.Connection) -> dict[str, int]:
@@ -533,6 +604,7 @@ def build(
     )
     counts["review_queue"] = len(review)
 
+    counts.update(_apply_fr_precedence(out))
     counts.update(_resolve_agencies(out))
 
     out.execute(

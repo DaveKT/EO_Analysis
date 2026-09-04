@@ -213,6 +213,25 @@ EO. **A revocation-network analysis silently drops those.** `target_eo_number`
 is still populated, so an unresolvable target is visibly unresolvable rather than
 missing.
 
+**The Federal Register wins wherever it has an opinion.** Its disposition notes
+are the authoritative record of what an order does to earlier orders. Where FR
+and the model both speak to an (order, target) pair, the FR row carries
+`authoritative = 1` and the model's carries `0` — *including when they agree*.
+This is not fussiness: 123 revocation pairs are asserted by both sources, and
+counting both inflated the revocation network by **27%**. An early version of the
+figures in the README made exactly that mistake (Trump→Biden read 124; the
+deduplicated figure is 106).
+
+- 3,918 FR edges: always authoritative.
+- 930 model edges on pairs FR is silent about: authoritative. Finding these is
+  the point of extraction.
+- 917 model edges superseded by FR, of which **174 contradict** it
+  (`contradicts_fr = 1`) — the model asserted a different relation.
+
+`revocation_network` already filters to `authoritative = 1`. If you query
+`relationships` directly, **add that predicate yourself** or you will
+double-count.
+
 ### 6.4 Agency names: 78% resolved, 22% long tail
 
 1,146 distinct names covered 3,195 taskings before normalisation, with
@@ -260,7 +279,12 @@ Across 402 orders. These are flagged, not fixed:
 
 The 63 relationship disagreements are the most interesting: the Federal
 Register's cross-references are authoritative, so a contradiction is more likely
-the model's error than FR's.
+the model's error than FR's. They are the subset of the 174 `contradicts_fr`
+rows where FR asserts one of `revokes`/`amends`/`supersedes`/`continues`. The
+commonest shapes are FR `amends` vs model `revokes` (20), FR `amends` vs model
+`references` (10), and FR `revokes` vs model `continues` (10). **As of
+2026-09-04 these are resolved in FR's favour by construction** — the model's row
+is retained but non-authoritative.
 
 ---
 

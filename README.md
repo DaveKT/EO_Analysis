@@ -88,9 +88,25 @@ agencies               621  canonical agencies
 agency_mentions      5,785  (claim_table, claim_id) -> agencies, many-to-many
 ```
 
-Three views come with it: `revocation_network` (both endpoints already resolved
-to real orders), `agency_taskings` (canonical agencies joined to their orders)
-and `all_claims` (every quoted claim in one shape).
+Three views come with it: `revocation_network` (both endpoints resolved to real
+orders, and deduplicated — see Federal Register precedence below),
+`agency_taskings` (canonical agencies joined to their orders) and `all_claims`
+(every quoted claim in one shape).
+
+### Federal Register precedence
+
+The Federal Register's disposition notes are the authoritative record of what an
+order does to earlier orders; the model's job is to *add* to them. So wherever FR
+has an opinion about an (order, target) pair, **the FR row is authoritative and
+the model's row is marked `authoritative = 0`** — including when the two agree,
+which is the common case. 917 model edges are superseded this way, 174 of them
+because the model asserted a *different* relation (`contradicts_fr = 1`).
+
+This matters for counting: 123 revocation pairs are asserted by both sources, and
+counting both inflated the revocation network by 27%. `revocation_network`
+filters to `authoritative = 1`. Model edges on pairs FR says nothing about are
+kept (930 of them) — finding those is the point of extracting relationships.
+Nothing is deleted; `superseded_by` names the FR row that outranks each one.
 
 ```sql
 -- who revokes whom, across administrations
@@ -414,9 +430,10 @@ Four presidents cluster at 30–34; Trump is more than double any of them.
 against Obama's 41%. This is the second axis earning its place: a single topic
 taxonomy would file both under vague domain buckets.
 
-**The revocation network.** Trump→Biden (124) and Biden→Trump (102) dwarf every
-earlier transition — Obama→G.W. Bush is 52, G.W. Bush→Clinton 44. Each president
-also revokes 10–32 of their own orders.
+**The revocation network.** Trump→Biden (106) and Biden→Trump (67) dwarf every
+earlier transition — Obama→G.W. Bush and G.W. Bush→Clinton are 37 each. (These
+counts are deduplicated: the Federal Register and the model both assert many of
+the same edges, and an earlier version of this figure double-counted them.)
 
 **Deadlines.** 886 of 2,240 descriptions parse to a duration; medians run from 60
 days (G.W. Bush) to 135 (Obama), with 30/60/90/120/180/365 the common windows.
