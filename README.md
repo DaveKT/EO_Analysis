@@ -217,6 +217,80 @@ The cheap sweep remains the plan of record for the full corpus (~$1.00 against
 ~$36 for `gpt-5.4`), with the topic-agreement gap recorded here rather than
 smoothed over.
 
+## The dataset (run 11, the full sweep)
+
+**1,534 orders, EO 12890 (1993-12-30) through EO 14423 (2026-08-28), $1.05.**
+`openai/gpt-oss-120b`, prompt v7, 4.56M input + 2.59M output tokens, ~2h50m.
+
+| Table | Rows |
+|---|---|
+| `extractions` | 1,534 |
+| `agencies_tasked` | 3,195 |
+| `relationships` (model-found) | 1,847 |
+| `deadlines` | 2,240 |
+| `authorities` | 1,707 |
+| `review_queue` | 866 |
+
+Gates over the whole corpus, against the 100-order pilot they were tuned on:
+
+| Gate | Target | Full sweep | 100-order pilot |
+|---|---|---|---|
+| severe quote drift | ≤ 2% | 1.8% | 1.7% |
+| stored quotes verified | 100% | 100% | 100% |
+| null rate | ≤ 2% | 0.0% | 0.0% |
+| truncation | 0 | 0 | 0 |
+| **`other` rate** | **≤ 3%** | **7.3% — FAILS** | 3.0% |
+| gold: primary_topic | ≥ 80% | 90% | 80% |
+| gold: instrument | ≥ 75% | 90% | 85% |
+| groundedness | reported | 94.0% | 94.8% |
+
+Three documents needed a second pass (two connection timeouts, one malformed
+response); `eo extract --run-id 11` recovered all three for $0.0007. Zero
+truncations across all 1,534 orders, including the 154,440-character maximum.
+
+### The `other` gate fails, and that is a real finding
+
+**7.3% of orders (112/1,534) answered `other` on one axis or the other**, against
+a 3% threshold. This gate exists to make vocabulary gaps loud — it is how
+`education` was found — so a failure here is information, not a defect. The
+extraction itself is sound: every `other` row carries a recorded free-text reason,
+and the other seven gates pass.
+
+Reading all 112 reasons, the failure decomposes into three unequal causes:
+
+| Cause | Rows | What would actually fix it |
+|---|---|---|
+| A category that already exists was not used | ~40 | prompt clarity, **not** new categories |
+| A genuine vocabulary gap | ~16 | one new instrument, `continues_body` |
+| Precedence unresolved on multi-action orders | ~15 | a clearer precedence rule |
+| Long-tail one-offs | remainder | nothing; this is the tail |
+
+The dominant cause is the *first*: roughly 40 rows had a correct answer available
+and did not take it — 15 designations and honours despite `confers_status_or_honor`
+existing, nine "Closing of Executive Departments and Agencies" orders, an order of
+succession despite `adjusts_pay_or_admin` naming succession explicitly, and tariff
+actions despite `imposes_sanctions` covering trade restriction. Adding categories
+would not fix any of those, and would lengthen the prompt, which
+[PLAN.md](PLAN.md) records as actively harmful: v6 added categories plus
+explanatory prose and regressed every metric.
+
+The axes behave differently and should not be treated as one number. **The topic
+axis is healthy at 1.8%** — its uncategorised reasons are true one-offs
+(millennium commemoration, the Army–Navy football broadcast, the National Garden
+of American Heroes). **The instrument axis carries 5.5%** and is where any future
+revision belongs.
+
+Two further honest notes:
+
+- **The 100-order pilot understated this at 3.0%.** A spread sample is
+  representative for grounding, which is a per-quote property, but not for
+  vocabulary coverage, because gaps cluster in order types the sample thins out.
+  Do not size a taxonomy from a pilot.
+- **The gold gates went up, not down** (topic 80% → 90%, instrument 85% → 90%) on
+  the same model and the same prompt. That is run-to-run nondeterminism, and it is
+  the same reason "all gates pass" was never claimed as a stable property. It cuts
+  both ways.
+
 ## What went wrong in v1, and what prevents it now
 
 | v1 failure | Evidence | Structural fix |

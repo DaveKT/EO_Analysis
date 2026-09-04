@@ -1,8 +1,10 @@
 # Executive Order Analysis — Development Plan
 
-**Status:** Phases 0-4 complete and pushed to `main`. The frontier-model
-comparison is done (run 10). Phase 5 (full sweep) not started.
-Written 2026-09-03; updated 2026-09-04 after the frontier comparison closed.
+**Status:** Phases 0-5 complete. The full corpus is extracted (run 11, 1,534
+orders, $1.05). Seven of eight gates pass; the `other` rate gate fails at 7.3%
+and that is a recorded finding, not an open defect. Notebook analysis and
+`eo export` are next.
+Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
 **Read this first if you are a fresh session picking up the work.**
 
 ---
@@ -19,20 +21,22 @@ Written 2026-09-03; updated 2026-09-04 after the frontier comparison closed.
 | 3 Runner | done | `providers.py` + `extract.py`, resumable, bounded async |
 | 4 Gates | done | all 8 gates pass on a 100-order sample (run 9) |
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
-| 5 Full sweep | **not started** | ~1,534 orders, ~$1.00, ~3 hours |
-| 6 Optional | not started | pre-1994 backfill, `--since`, dashboard |
+| 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
+| 5b Analysis | **not started** | notebook, then `eo export` |
+| 6 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
 
 ### The state in the database (`data/eo.db`, gitignored, rebuildable)
 
 - `documents`: 1,556 rows. `extractable_documents` view: **1,534** -- one canonical
   row per EO number, excluding C1-/Z9- corrections and preferring R1- reprints.
 - `relationships` with `run_id IS NULL`: 3,924 edges seeded from FR disposition notes.
-- `extraction_runs`: 10 runs. **Run 9 (prompt v7) is the good one** for the cheap
-  model and the baseline for the sweep. Runs 1-8 are kept deliberately: they are the
+- `extraction_runs`: 11 runs. **Run 11 is the shipped dataset** -- the full corpus.
+  Run 9 (prompt v7, 100 orders) was the pilot and the sweep's baseline. Runs 1-8 are kept deliberately: they are the
   evidence for the prompt decisions below, and diffing them is the point of
   versioning by (model, prompt_version). **Run 10 is the frontier comparison**:
   `openai/gpt-5.4`, prompt v7, the 36-order comparison set.
-- Nothing has been extracted beyond the 100-order sample and that 36-order subset.
+- Run 11 holds all 1,534 orders: 3,195 agencies tasked, 2,240 deadlines, 1,707
+  authorities, 1,847 model-found relationships, 866 review-queue items.
 
 ### Run 9 results, the baseline to beat
 
@@ -77,6 +81,46 @@ after overlap), $0.85. Reproduce with `eo compare --baseline 9 --candidate 10`.
 - Cost of sweeping the full corpus on `gpt-5.4` would be ~$36 against ~$1.00.
   The cheap sweep remains the plan of record, with the gap recorded in the README.
 
+### Run 11, the full sweep -- what shipped
+
+1,534 orders, `openai/gpt-oss-120b`, prompt v7, $1.0464, 4.56M in + 2.59M out
+tokens, ~2h50m at concurrency 8.
+
+```
+severe quote drift      1.8%   (<= 2%)     PASS
+stored quotes verified  100%   (100%)      PASS
+null rate               0.0%   (<= 2%)     PASS
+truncation              0      (0)         PASS
+other rate              7.3%   (<= 3%)     FAIL
+gold: primary_topic     90%    (>= 80%)    PASS
+gold: instrument        90%    (>= 75%)    PASS
+groundedness            94.0%  (reported)
+```
+
+- **Zero truncations across all 1,534 orders**, including the 154,440-char
+  maximum. The 8,000-token cap is adequate for the whole corpus.
+- Three documents needed a second pass (two `TimeoutError`, one malformed
+  response). `eo extract --run-id 11` recovered all three for $0.0007. Timeouts
+  ran at ~226 retries over the run; none exhausted 4/4 except those two.
+- **The gold gates went UP on the same model and prompt** (topic 80->90,
+  instrument 85->90). Nondeterminism cuts both ways; this is why "all gates pass"
+  is not claimed as a property.
+- **The `other` gate failure is a finding, decomposed in the README.** ~40 of the
+  112 rows had a correct existing category available and did not use it (15
+  honours despite `confers_status_or_honor`, 9 agency-closure orders, succession
+  despite `adjusts_pay_or_admin`, tariffs despite `imposes_sanctions`). Only ~16
+  are a genuine gap (`continues_body`). **Adding categories is the wrong fix for
+  the dominant cause** -- see the v6 lesson below. Topic axis is healthy at 1.8%;
+  instrument carries 5.5%.
+- **The 100-order pilot understated `other` at 3.0%.** A spread sample is
+  representative for per-quote properties like grounding, but not for vocabulary
+  coverage, because gaps cluster in order types a spread thins out. Do not size a
+  taxonomy from a pilot.
+
+**Decision 2026-09-04: ship run 11 and document the 7.3%** rather than spend
+another $1.05 on a v8 re-sweep. The dataset is complete and every `other` row
+carries its reason, so the gap is traceable rather than hidden.
+
 ### How to run it
 
 ```sh
@@ -99,9 +143,13 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    task's, and the cheap sweep is still the right call at 1/36th the cost.
 2. **Decide the three contested instrument labels** (below) before the sweep
    treats the gold set as ground truth. Costs nothing, needs a human.
-3. **Phase 5 full sweep.** `eo extract` with no `--limit`, ~1,534 orders, ~$1.00,
-   ~3 hours. Resumable: rerun with `--run-id N` to retry failures.
-4. Notebook analysis, then `eo export`.
+3. ~~Phase 5 full sweep~~ **Done 2026-09-04, run 11.** See above.
+4. **Notebook analysis, then `eo export`.** Reads run 11 from SQLite; no pipeline
+   logic in the notebook. EOs per president per year, topic mix over time, the
+   revocation network across administrations, median deadline length, most-tasked
+   agencies.
+5. Optional Phase 6: instrument taxonomy v8 (`continues_body` plus precedence
+   clarity, *not* a pile of new categories), pre-1994 backfill, `eo fetch --since`.
 
 ### Open risks a fresh session should not rediscover the hard way
 
