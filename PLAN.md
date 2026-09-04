@@ -23,7 +23,7 @@ Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
 | 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
 | 5b Export | done | `eo export`, one run + manifest, CSV |
-| 5c Notebook | **not started** | needs jupyter/matplotlib, not installed |
+| 5c Notebook | deferred | see decision below; findings are in the README |
 | 6 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
 
 ### The state in the database (`data/eo.db`, gitignored, rebuildable)
@@ -145,12 +145,26 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 2. **Decide the three contested instrument labels** (below) before the sweep
    treats the gold set as ground truth. Costs nothing, needs a human.
 3. ~~Phase 5 full sweep~~ **Done 2026-09-04, run 11.** See above.
-4. **Notebook analysis, then `eo export`.** Reads run 11 from SQLite; no pipeline
-   logic in the notebook. EOs per president per year, topic mix over time, the
-   revocation network across administrations, median deadline length, most-tasked
-   agencies.
-5. Optional Phase 6: instrument taxonomy v8 (`continues_body` plus precedence
-   clarity, *not* a pile of new categories), pre-1994 backfill, `eo fetch --since`.
+4. ~~`eo export`~~ **Done 2026-09-04.** One run to flat files plus a provenance
+   manifest, scoped to a single `run_id`.
+5. ~~Notebook analysis~~ **Deferred 2026-09-04, by decision.** `jupyter`,
+   `ipykernel`, `nbformat` and `matplotlib` are none of them installed, and an
+   `.ipynb` written without executing it has unverified outputs -- the exact
+   "looks finished, isn't" shape this project exists to prevent. The analyses the
+   notebook was to contain were run directly against SQLite and their **verified**
+   results are recorded in the README under "What the dataset shows". Anyone
+   picking this up: install the four deps and execute the notebook, or do not ship
+   one.
+6. Optional Phase 6, in rough priority order:
+   - **Normalise agency names** before any agency ranking is published --
+     `Secretary of the Treasury` and `Department of the Treasury` are currently
+     distinct entities.
+   - **Improve deadline parsing** -- only 886 of 2,240 descriptions (40%) yield a
+     duration, so median-deadline figures cover the parseable subset only.
+   - Resolve the three contested gold `instrument` labels (EO 14081, 13489, 14287).
+   - Instrument taxonomy v8: `continues_body` plus precedence clarity, *not* a pile
+     of new categories.
+   - Pre-1994 backfill from NARA disposition tables; `eo fetch --since`.
 
 ### Open risks a fresh session should not rediscover the hard way
 

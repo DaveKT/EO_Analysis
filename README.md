@@ -257,6 +257,46 @@ Three documents needed a second pass (two connection timeouts, one malformed
 response); `eo extract --run-id 11` recovered all three for $0.0007. Zero
 truncations across all 1,534 orders, including the 154,440-character maximum.
 
+### What the dataset shows
+
+Verified against `data/eo.db` (run 11). These are sanity checks on the extraction,
+not a finished analysis — the notebook is deferred, and the caveats below are real.
+
+**Orders per active year.** Trump's two terms are non-contiguous, so a first-to-last
+date span attributes 2021–24 to him and understates the rate. Counting only calendar
+years in which each president actually signed:
+
+| President | Orders | Per active year |
+|---|---|---|
+| Clinton | 308 | 34.2 |
+| G.W. Bush | 291 | 32.3 |
+| Obama | 276 | 30.7 |
+| **Trump** | **497** | **71.0** |
+| Biden | 162 | 32.4 |
+
+Four presidents cluster at 30–34; Trump is more than double any of them.
+
+**Instrument mix separates administrations.** Trump's orders are 37%
+`delegates_authority` against 14–23% for everyone else, and 19% `creates_body`
+against Obama's 41%. This is the second axis earning its place: a single topic
+taxonomy would file both under vague domain buckets.
+
+**The revocation network.** Trump→Biden (124) and Biden→Trump (102) dwarf every
+earlier transition — Obama→G.W. Bush is 52, G.W. Bush→Clinton 44. Each president
+also revokes 10–32 of their own orders.
+
+**Deadlines.** 886 of 2,240 descriptions parse to a duration; medians run from 60
+days (G.W. Bush) to 135 (Obama), with 30/60/90/120/180/365 the common windows.
+
+**Most-tasked officials** are the Attorney General (92 tasks), Secretary of the
+Treasury (91), Commerce (73) and State (69).
+
+Two caveats before anyone quotes these. **Agency names are not normalised** —
+`Secretary of the Treasury` and `Department of the Treasury` are counted as
+different entities, so agency rankings are indicative only. And **only 40% of
+deadline descriptions parse** to a duration, so the medians describe the parseable
+subset, not all deadlines.
+
 ### The `other` gate fails, and that is a real finding
 
 **7.3% of orders (112/1,534) answered `other` on one axis or the other**, against
