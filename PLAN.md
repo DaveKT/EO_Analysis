@@ -1,7 +1,100 @@
 # Executive Order Analysis — Development Plan
 
-**Status:** approved plan, not yet implemented. Written 2026-09-03.
+**Status:** Phases 0-4 complete and pushed to `main`. Phase 5 (full sweep) not started.
+Written 2026-09-03; status section below updated 2026-09-03 after Phase 4 closed.
 **Read this first if you are a fresh session picking up the work.**
+
+---
+
+## 0. Where the work actually stands (read before anything else)
+
+### Done
+
+| Phase | State | Evidence |
+|---|---|---|
+| 0 Reset | done | v1 in `archive/`, `my_secrets.py` deleted, package scaffolded |
+| 1 Ingest | done | 1,556 documents, EO 12890 (1993-12-30) -> EO 14423 (2026-08-28) |
+| 2 Contract | done | `models.py` + 3,924 FR relationship edges seeded |
+| 3 Runner | done | `providers.py` + `extract.py`, resumable, bounded async |
+| 4 Gates | done | all 8 gates pass on a 100-order sample (run 9) |
+| 5 Full sweep | **not started** | ~1,534 orders, ~$1.00, ~3 hours |
+| 6 Optional | not started | pre-1994 backfill, `--since`, dashboard |
+
+### The state in the database (`data/eo.db`, gitignored, rebuildable)
+
+- `documents`: 1,556 rows. `extractable_documents` view: **1,534** -- one canonical
+  row per EO number, excluding C1-/Z9- corrections and preferring R1- reprints.
+- `relationships` with `run_id IS NULL`: 3,924 edges seeded from FR disposition notes.
+- `extraction_runs`: 9 runs. **Run 9 (prompt v7) is the good one** and the only one
+  that passes every gate. Runs 1-8 are kept deliberately: they are the evidence for
+  the prompt decisions below, and diffing them is the point of versioning by
+  (model, prompt_version).
+- Nothing has been extracted beyond the 100-order sample.
+
+### Run 9 results, the baseline to beat
+
+```
+severe quote drift      1.7%   (<= 2%)     PASS
+stored quotes verified  100%   (100%)      PASS
+null rate               0.0%   (<= 2%)     PASS
+truncation              0      (0)         PASS
+other rate              3.0%   (<= 3%)     PASS
+gold: primary_topic     80%    (>= 80%)    PASS
+gold: instrument        85%    (>= 75%)    PASS
+groundedness            94.8%  (reported)
+```
+100/100 extracted, 0 failures, $0.063, `openai/gpt-oss-120b`.
+
+**Three of those pass at or within a point of their threshold.** The model is
+nondeterministic; a re-run may not clear all eight. Do not present "all gates pass"
+as a stable property of the pipeline.
+
+### How to run it
+
+```sh
+PYTHONPATH=src .venv/bin/python -m eo.cli status
+PYTHONPATH=src .venv/bin/python -m eo.cli extract --limit 100
+PYTHONPATH=src .venv/bin/python -m eo.cli validate --run-id 9
+PYTHONPATH=src .venv/bin/python -m eo.cli review --run-id 9
+```
+
+`PYTHONPATH=src` is required on this machine: files in the venv carry the macOS
+`UF_HIDDEN` flag, CPython >= 3.11.4 skips hidden `.pth` files, and that silently
+voids the editable install. `chflags nohidden` does not persist. See README.
+
+The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
+
+### What to do next, in order
+
+1. **Frontier-model comparison (~$5, recommended first).** Re-run the gold 20 plus
+   flagged rows on a frontier model. Three gates sit on their thresholds and it is
+   not known whether 94.8% groundedness and 80% topic agreement are this model's
+   ceiling or the task's. The answer belongs in the README as an honest quality
+   figure, and it decides whether the cheap sweep is good enough.
+2. **Phase 5 full sweep.** `eo extract` with no `--limit`, ~1,534 orders, ~$1.00,
+   ~3 hours. Resumable: rerun with `--run-id N` to retry failures.
+3. Notebook analysis, then `eo export`.
+
+### Open risks a fresh session should not rediscover the hard way
+
+- **The gold set is Claude's labels, not an expert's.** 20 orders read from source.
+  80% agreement means the model matches *that* reading. Two labels were found wrong
+  during Phase 4 (EO 13985, EO 14081), caught only because the precedence rule gave
+  an objective test. Worth a human review before it anchors anything further.
+- **Four separate times, a constraint lived only in the Pydantic validator where the
+  model could not see it** -- `maxItems` on secondary topics, the repeated-topic rule,
+  and the `other`-requires-a-reason rule on both axes. Each one silently destroyed
+  otherwise-good extractions. Before adding any validation, ask whether the model is
+  shown the rule; if JSON Schema cannot express it, normalise or flag, never reject.
+- **Prompt length is not free.** v6 added two genuinely-missing categories *and*
+  paragraphs explaining them, and regressed every metric (topic 80->75, instrument
+  90->80, other 7->11). v7 kept the categories and deleted the prose: other fell to
+  3%. Explaining what a category does *not* cover teaches the model to answer `other`.
+- **Provider hazards, all now handled but easy to reintroduce**: OpenRouter routes to
+  providers that ignore `response_format` unless `provider.require_parameters` is set;
+  httpx timeouts are per socket operation, so a trickling connection hangs forever
+  without `asyncio.wait_for`; empty and malformed responses are transient and worth
+  one retry.
 
 ---
 
@@ -21,7 +114,7 @@ the single most important change.
 |---|---|
 | Analysis output | Structured extraction (summary, topics, agencies, deadlines, authorities, EO relationships) |
 | Corpus scope | Multi-administration history — all EOs available from the Federal Register API |
-| Model provider | Provider-agnostic via **OpenRouter** (`OPENROUTER_API_KEY`, already in env) |
+| Model provider | Provider-agnostic via **OpenRouter** (`eo_openrouterkey`; the old `OPENROUTER_API_KEY` name is deliberately not read) |
 | Deliverable | Python CLI stages writing to **SQLite**; Jupyter reserved for analysis, not pipeline |
 
 ---
@@ -169,7 +262,7 @@ caught automatically by this one column.
 Each phase ends in something runnable and checkable. Do not start a phase before its
 predecessor's exit criteria pass.
 
-### Phase 0 — Reset (no network, no cost)
+### Phase 0 — Reset (no network, no cost) — **DONE**
 - `git mv` v1 code into `archive/`: `EO_Analysis.ipynb`, `Initial_EO_Research/`, the loose CSVs.
   Keep them — they are the post-mortem evidence.
 - Delete `my_secrets.py` and its `__pycache__` entry; **rotate the OpenAI key that was in it**
@@ -181,7 +274,7 @@ predecessor's exit criteria pass.
 
 **Exit:** `eo status` runs and reports an empty database.
 
-### Phase 1 — Ingest, zero LLM
+### Phase 1 — Ingest, zero LLM — **DONE**
 - Page the FR API for all `presidential_document_type=executive_order`, oldest→newest,
   ~50 pages at `per_page=100`. Use the URL-encoded bracket form
   (`conditions%5Btype%5D%5B%5D=PRESDOCU`) — the unencoded form failed in testing.
@@ -194,7 +287,7 @@ predecessor's exit criteria pass.
 5 EOs across different presidencies against the live site. This whole phase is free — get it
 completely right before spending a cent on tokens.
 
-### Phase 2 — Extraction contract
+### Phase 2 — Extraction contract — **DONE**
 - `models.py`: Pydantic model → JSON schema, passed to the provider as a structured-output
   schema. **No regex line-parsing of prose.** v1 lost 47 of 143 rows to `**Sentiment:**`
   defeating `startswith("sentiment:")`.
@@ -207,7 +300,7 @@ completely right before spending a cent on tokens.
 
 **Exit:** schema validates against 3 hand-written fixture extractions; no API calls yet.
 
-### Phase 3 — Extraction runner
+### Phase 3 — Extraction runner — **DONE**
 - `providers.py`: OpenRouter is OpenAI-compatible — `base_url="https://openrouter.ai/api/v1"`.
   Model id is config, never hardcoded at a call site. Record per-call token usage and cost into
   `extraction_runs`.
@@ -225,7 +318,7 @@ completely right before spending a cent on tokens.
 
 **Exit:** a 25-EO run across four presidencies completes with 0 nulls and a printed cost.
 
-### Phase 4 — Validation gates
+### Phase 4 — Validation gates — **DONE**
 Run automatically at the end of every extraction run; the run **fails** if gates fail.
 
 1. **Groundedness:** every `source_quote` must appear in `body_text` (normalized whitespace).
@@ -240,7 +333,7 @@ Run automatically at the end of every extraction run; the run **fails** if gates
 
 **Exit:** gates pass on a 100-EO sample.
 
-### Phase 5 — Full run + analysis
+### Phase 5 — Full run + analysis — **NEXT**
 - Full 1,559-EO extraction with the cheap model; gates must pass.
 - Re-run the gold set + any low-confidence rows on a frontier model; compare, and record the
   disagreement rate in the README as an honest quality figure.
@@ -315,6 +408,13 @@ Carry this table into the README. Every v1 failure has exactly one structural fi
   technology, the Space Academy) and had no home. Caught before any tokens were spent.
 - ~~Decide whether `significance` survives alongside `instrument`~~ **Resolved 2026-09-03:
   both are kept as separate fields.**
-- Pick the sweep model at Phase 3 (`gpt-oss-120b` is the default recommendation).
+- ~~Pick the sweep model at Phase 3~~ **Settled: `openai/gpt-oss-120b`**, which clears
+  every gate at $0.063 per 100 orders (~$1.00 for the corpus). Revisit only if the
+  frontier-model comparison shows the ceiling is the model rather than the task.
+- ~~Confirm significance~~ **Dropped 2026-09-03.** The model rated 19 of 25 orders
+  `major` and none `routine`, agreeing with hand labels 0% of the time. Alone among
+  the fields it had no textual referent to check against.
+- **Still open:** should a domain expert review the 20 gold labels before the full
+  sweep treats them as ground truth?
 - Decide whether proclamations and presidential memoranda eventually join the corpus. The
   schema supports it; scope currently says EOs only.
