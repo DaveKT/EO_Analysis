@@ -1,22 +1,26 @@
 """`eo` command line.
 
-Phase 0 implements `status` only. The remaining stages are declared here so the
-command surface is visible, and each fails loudly rather than pretending to work
--- v1's defining bug was code that reported success over empty results.
+Every stage is declared here so the command surface is visible, and each fails
+loudly rather than pretending to work -- v1's defining bug was code that
+reported success over empty results.
 """
 
 from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from pathlib import Path
 
 import typer
 
 from eo import __version__, db, dispositions, ingest, prompts
 from eo import compare as compare_mod
+from eo import export as export_mod
 from eo import extract as extract_mod
 from eo import validate as validate_mod
 from eo.config import API_KEY_VAR, Settings, load_settings
+
+DEFAULT_EXPORT_DIR = "data/export"
 
 app = typer.Typer(
     add_completion=False,
@@ -390,9 +394,60 @@ def review(
 
 
 @app.command()
-def export() -> None:
-    """Export the dataset to CSV/Parquet."""
-    _not_yet("export", "Phase 5")
+def export(
+    run_id: int = typer.Option(..., "--run-id", help="Run to export."),
+    out: str = typer.Option(
+        DEFAULT_EXPORT_DIR, "--out", help="Directory to write into."
+    ),
+    fmt: str = typer.Option(
+        export_mod.CSV, "--format", help="csv or parquet.", show_default=True
+    ),
+    include_text: bool = typer.Option(
+        False, "--include-text",
+        help="Include body_text and raw_response. Large; off by default.",
+    ),
+) -> None:
+    """Export one extraction run to flat files, with a provenance manifest."""
+    settings = load_settings()
+    if fmt not in (export_mod.CSV, export_mod.PARQUET):
+        typer.secho(
+            f"unknown format: {fmt} (expected csv or parquet)",
+            fg=typer.colors.RED, err=True,
+        )
+        raise typer.Exit(code=2)
+    if fmt == export_mod.PARQUET:
+        # Fail before writing anything, not halfway through the third table.
+        try:
+            import pyarrow  # noqa: F401
+        except ImportError:
+            typer.secho(
+                "parquet needs pyarrow, which is not installed."
+                " Use --format csv, or `pip install pyarrow`.",
+                fg=typer.colors.RED, err=True,
+            )
+            raise typer.Exit(code=2) from None
+
+    out_dir = Path(out)
+    with db.session(settings.db_path) as con:
+        if not con.execute(
+            "SELECT 1 FROM extraction_runs WHERE run_id = ?", (run_id,)
+        ).fetchone():
+            typer.secho(f"no such run: {run_id}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=2)
+        counts = export_mod.export_run(
+            con, run_id, out_dir, fmt=fmt, include_text=include_text
+        )
+
+    typer.echo(f"exported run {run_id} to {out_dir}/ as {fmt}")
+    for name, count in counts.items():
+        size = (out_dir / f"{name}.{fmt}").stat().st_size
+        typer.echo(f"  {name:<18} {count:>7,} rows  {size / 1024:>8,.0f} KB")
+    typer.echo(f"  {'manifest.json':<18} {'':>7}       provenance: run, model, prompt")
+    if not include_text:
+        typer.echo("")
+        typer.echo(
+            "body_text and raw_response omitted; pass --include-text to keep them."
+        )
 
 
 def _axis_block(axis: compare_mod.Axis, baseline: int, candidate: int) -> None:

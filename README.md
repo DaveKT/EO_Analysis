@@ -54,8 +54,17 @@ eo extract    # Phase 3: the LLM pass
 eo validate   # Phase 4: quality gates
 eo review     # Phase 4: what the gates parked for human review
 eo compare    # two runs, head to head over the documents both cover
-eo export     # Phase 5: CSV/Parquet                       (not yet implemented)
+eo export     # one run to flat files, with a provenance manifest
 ```
+
+`eo export --run-id 11` writes `orders`, `agencies_tasked`, `deadlines`,
+`authorities`, `relationships` and `review_queue` to `data/export/`, plus a
+`manifest.json` recording the run, model, prompt version, token counts, cost and
+coverage boundary. Export is scoped to **one run**: extractions are versioned by
+(model, prompt_version) and eleven runs share the tables, so an unscoped dump
+would interleave runs of different quality. `body_text` and `raw_response` are
+omitted unless you pass `--include-text`. `--format parquet` needs `pyarrow`,
+which is not a pinned dependency.
 
 Comparing two models is a first-class operation, not a one-off script, because
 a single run's gate report cannot distinguish the model's ceiling from the
