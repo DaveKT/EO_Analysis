@@ -4,3 +4,4 @@ __pycache__
 data/
 .env
 my_secrets.py
+.DS_Store
