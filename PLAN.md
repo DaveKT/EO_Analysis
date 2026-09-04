@@ -1,11 +1,19 @@
 # Executive Order Analysis — Development Plan
 
-**Status:** Phases 0-5 complete. The full corpus is extracted (run 11, 1,534
-orders, $1.05). Seven of eight gates pass; the `other` rate gate fails at 7.3%
-and that is a recorded finding, not an open defect. Notebook analysis and
-`eo export` are next.
-Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
+**Status: the data side is complete and paused.** The full corpus is extracted
+(run 11, 1,534 orders, $1.05), exported, and packaged as a standalone analysis
+database with normalised agency names. Seven of eight gates pass; the `other`
+rate gate fails at 7.3%, which is a recorded finding, not an open defect.
+**Analysis is the next phase and has not started.**
+Written 2026-09-03; updated 2026-09-04 when the data side closed.
 **Read this first if you are a fresh session picking up the work.**
+
+Three companion documents carry what this plan does not:
+[README.md](README.md) is how to run it and what the dataset shows;
+**[DATA_QUALITY.md](DATA_QUALITY.md)** is every control, finding and caveat —
+*read it before quoting any number*;
+**[DATA_DICTIONARY.md](DATA_DICTIONARY.md)** is the schema and ERD of
+`data/analysis.db`.
 
 ---
 
@@ -23,8 +31,11 @@ Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
 | 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
 | 5b Export | done | `eo export` (CSV) and `eo analysis-db` (SQLite) |
-| 5c Notebook | deferred | see decision below; findings are in the README |
-| 6 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
+| 5c Agency normalisation | done | 1,146 raw names -> 621 canonical, 78% matched |
+| 5d Documentation | done | `DATA_QUALITY.md`, `DATA_DICTIONARY.md` + ERD |
+| 5e Notebook | deferred | by decision; findings are in the README |
+| 6 Analysis | **next** | the user's own work, against `data/analysis.db` |
+| 7 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
 
 ### The state in the database (`data/eo.db`, gitignored, rebuildable)
 
@@ -38,6 +49,15 @@ Written 2026-09-03; updated 2026-09-04 after the full sweep closed.
   `openai/gpt-5.4`, prompt v7, the 36-order comparison set.
 - Run 11 holds all 1,534 orders: 3,195 agencies tasked, 2,240 deadlines, 1,707
   authorities, 1,847 model-found relationships, 866 review-queue items.
+
+### The shipped artefacts (both gitignored, both rebuildable)
+
+- **`data/analysis.db`** (23.7 MB) -- the thing to do analysis against. Run 11
+  plus its source text, normalised and keyed; 12 tables, 3 views, foreign keys
+  checked at build time. `eo analysis-db --run-id 11`. Schema and ERD in
+  [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
+- **`data/export/`** (4.3 MB) -- six CSVs plus `manifest.json`, for anyone who
+  does not want SQLite. `eo export --run-id 11`.
 
 ### Run 9 results, the baseline to beat
 
@@ -126,9 +146,12 @@ carries its reason, so the gap is traceable rather than hidden.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m eo.cli status
-PYTHONPATH=src .venv/bin/python -m eo.cli extract --limit 100
-PYTHONPATH=src .venv/bin/python -m eo.cli validate --run-id 9
-PYTHONPATH=src .venv/bin/python -m eo.cli review --run-id 9
+PYTHONPATH=src .venv/bin/python -m eo.cli validate   --run-id 11   # the eight gates
+PYTHONPATH=src .venv/bin/python -m eo.cli review     --run-id 11   # 866 flagged items
+PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
+PYTHONPATH=src .venv/bin/python -m eo.cli analysis-db --run-id 11  # rebuild the DB
+PYTHONPATH=src .venv/bin/python -m eo.cli export      --run-id 11  # rebuild the CSVs
+PYTHONPATH=src .venv/bin/python -m pytest -q                       # 148 tests
 ```
 
 `PYTHONPATH=src` is required on this machine: files in the venv carry the macOS
@@ -146,7 +169,9 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    treats the gold set as ground truth. Costs nothing, needs a human.
 3. ~~Phase 5 full sweep~~ **Done 2026-09-04, run 11.** See above.
 4. ~~`eo export`~~ **Done 2026-09-04.** One run to flat files plus a provenance
-   manifest, scoped to a single `run_id`.
+   manifest, scoped to a single `run_id`. `eo analysis-db` followed, packaging the
+   same run with its source text as a standalone joinable database, and agency
+   names were normalised into a canonical dimension + bridge.
 5. ~~Notebook analysis~~ **Deferred 2026-09-04, by decision.** `jupyter`,
    `ipykernel`, `nbformat` and `matplotlib` are none of them installed, and an
    `.ipynb` written without executing it has unverified outputs -- the exact
@@ -155,16 +180,30 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    results are recorded in the README under "What the dataset shows". Anyone
    picking this up: install the four deps and execute the notebook, or do not ship
    one.
-6. Optional Phase 6, in rough priority order:
-   - **Normalise agency names** before any agency ranking is published --
-     `Secretary of the Treasury` and `Department of the Treasury` are currently
-     distinct entities.
-   - **Improve deadline parsing** -- only 886 of 2,240 descriptions (40%) yield a
-     duration, so median-deadline figures cover the parseable subset only.
-   - Resolve the three contested gold `instrument` labels (EO 14081, 13489, 14287).
-   - Instrument taxonomy v8: `continues_body` plus precedence clarity, *not* a pile
-     of new categories.
-   - Pre-1994 backfill from NARA disposition tables; `eo fetch --since`.
+6. ~~Normalise agency names~~ **Done 2026-09-04.** 1,146 raw names resolve to 621
+   canonical entities, 78% of mentions matched. `Department of War` merges into
+   `Department of Defense` per the user's decision on 2026-09-04 (EO 14347 renamed
+   it; it is one institution), with the period recoverable from `raw_name`.
+7. **Analysis is the next phase**, against `data/analysis.db`. Nothing on the data
+   side is blocking it.
+
+### Still open, in rough priority order
+
+- **The three contested gold `instrument` labels** -- EO 14081, EO 13489,
+  EO 14287. Free, needs a human, and they now anchor a 1,534-order dataset rather
+  than a 100-order pilot. EO 14081 is the tractable one: it turns on whether an
+  *Initiative* counts as a *body*, which the convention never says. See
+  [DATA_QUALITY.md](DATA_QUALITY.md) §4.
+- **The 63 relationship disagreements** in the review queue, where the model
+  contradicted an authoritative Federal Register disposition note.
+- **Improve deadline parsing** -- only 888 of 2,240 descriptions (40%) yield a
+  duration, so median-deadline figures cover the parseable subset only.
+- **Instrument taxonomy v8**: `continues_body` plus precedence clarity, *not* a
+  pile of new categories. ~40 of the 112 `other` rows had a correct category
+  available and did not use it, so the dominant fix is prompt clarity. A re-sweep
+  costs ~$1.05.
+- Extend the agency alias table -- 22% of mentions keep their cleaned surface form.
+- Pre-1994 backfill from NARA disposition tables; `eo fetch --since`.
 
 ### Open risks a fresh session should not rediscover the hard way
 

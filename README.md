@@ -8,6 +8,14 @@ a quoted span of the source document.
 The development plan is [PLAN.md](PLAN.md). The v1 attempt is preserved in
 [archive/](archive/) as post-mortem evidence, not as working code.
 
+**Start here depending on what you want:**
+
+| | |
+|---|---|
+| Do analysis | [DATA_DICTIONARY.md](DATA_DICTIONARY.md) — schema, ERD, worked joins for `data/analysis.db` |
+| Know what to trust | **[DATA_QUALITY.md](DATA_QUALITY.md)** — every control, finding and caveat. *Read before quoting a number.* |
+| Understand the build | [PLAN.md](PLAN.md) — phase status, decisions, what is still open |
+
 ## Coverage boundary
 
 **This dataset is not "all executive orders."** The Federal Register API's
@@ -76,7 +84,7 @@ authorities          1,707  id PK -> orders
 relationships        5,765  id PK -> orders, target_document_number -> orders
 raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
 review_queue           866  id PK -> orders
-agencies               622  canonical agencies
+agencies               621  canonical agencies
 agency_mentions      5,785  (claim_table, claim_id) -> agencies, many-to-many
 ```
 
@@ -115,11 +123,13 @@ Three things to know before writing queries against it:
 
 ### Agency normalisation
 
+Full rules and the judgment calls behind them: [DATA_QUALITY.md](DATA_QUALITY.md) §6.4.
+
 The extraction records agencies as each order names them — which is correct, since
 the `source_quote` has to match the text — but that left 1,146 distinct names over
 3,195 taskings, with `Secretary of the Treasury` (91) and `Department of the
 Treasury` (66) as separate entities. `agencies` + `agency_mentions` resolve them to
-**622 canonical entities**, covering **78% of mentions** by the alias table.
+**621 canonical entities**, covering **78% of mentions** by the alias table.
 
 ```sql
 SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
@@ -421,6 +431,8 @@ deadline descriptions parse** to a duration, so the medians describe the parseab
 subset, not all deadlines.
 
 ### The `other` gate fails, and that is a real finding
+
+Full decomposition and the rest of the known limits: [DATA_QUALITY.md](DATA_QUALITY.md).
 
 **7.3% of orders (112/1,534) answered `other` on one axis or the other**, against
 a 3% threshold. This gate exists to make vocabulary gaps loud — it is how
