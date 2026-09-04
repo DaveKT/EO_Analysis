@@ -19,6 +19,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "ruff==0.16.5"]
+# The analysis notebook. Kept out of the base install so the pipeline stays
+# light; `pip install -e ".[analysis]"` before opening notebooks/.
+analysis = [
+    "jupyterlab==4.6.3",
+    "ipykernel==7.3.0",
+    "nbformat==5.11.1",
+    "nbconvert==7.17.1",
+    "matplotlib==3.11.1",
+]
 
 [project.scripts]
 eo = "eo.cli:main"

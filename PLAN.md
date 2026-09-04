@@ -36,7 +36,7 @@ list of traps — *the first thing to read before querying*;
 | 5c Agency normalisation | done | 1,146 raw names -> 598 canonical, 82% matched |
 | 5d Documentation | done | quality, dictionary + ERD, cheat sheet |
 | 5f Publication | done | `data/analysis.db` + `data/export/` committed |
-| 5e Notebook | deferred | by decision; findings are in the README |
+| 5e Notebook | started | `notebooks/analysis.ipynb`, executed; setup + sanity checks |
 | 6 Analysis | **next** | the user's own work, against `data/analysis.db` |
 | 7 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
 
@@ -183,14 +183,16 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    manifest, scoped to a single `run_id`. `eo analysis-db` followed, packaging the
    same run with its source text as a standalone joinable database, and agency
    names were normalised into a canonical dimension + bridge.
-5. ~~Notebook analysis~~ **Deferred 2026-09-04, by decision.** `jupyter`,
-   `ipykernel`, `nbformat` and `matplotlib` are none of them installed, and an
-   `.ipynb` written without executing it has unverified outputs -- the exact
-   "looks finished, isn't" shape this project exists to prevent. The analyses the
-   notebook was to contain were run directly against SQLite and their **verified**
-   results are recorded in the README under "What the dataset shows". Anyone
-   picking this up: install the four deps and execute the notebook, or do not ship
-   one.
+5. ~~Notebook analysis~~ **Started 2026-09-04** as `notebooks/analysis.ipynb`.
+   It was deferred earlier the same day because none of the notebook deps were
+   installed and an unexecuted `.ipynb` has unverified outputs -- the exact "looks
+   finished, isn't" shape this project exists to prevent. They are now pinned as
+   the `analysis` extra (`pip install -e ".[analysis]"`), and the notebook is
+   **committed only after execution** (`jupyter nbconvert --execute --inplace`,
+   with `PYTHONPATH=src`), so every output in it was produced by the code above
+   it. It opens `analysis.db` read-only, re-runs the quote check on all 8,989
+   claims and asserts on it, and carries the cheat sheet's caveats at the top.
+   Analysis sections are added as questions are asked.
 6. ~~Normalise agency names~~ **Done 2026-09-04.** 1,146 raw names resolve to 598
    canonical entities, 82% of mentions matched. The alias table was extended on
    2026-09-04 with 31 standing agencies, and bare in-document references

@@ -62,6 +62,19 @@ returns, run commands as `PYTHONPATH=src .venv/bin/python -m eo.cli ...`.
 
 ## Usage
 
+The analysis lives in `notebooks/analysis.ipynb`, which reads `data/analysis.db`
+read-only and never touches the pipeline. Its dependencies are the `analysis`
+extra, and the notebook is committed only after being executed, so its outputs
+are real:
+
+```sh
+.venv/bin/pip install -e ".[analysis]"
+PYTHONPATH=src .venv/bin/jupyter lab notebooks/analysis.ipynb
+PYTHONPATH=src .venv/bin/jupyter nbconvert --to notebook --execute --inplace notebooks/analysis.ipynb
+```
+
+The pipeline itself:
+
 ```sh
 eo status     # configuration, row counts, ingest health
 eo fetch      # Phase 1: ingest from the Federal Register (free, no model calls)
@@ -431,7 +444,8 @@ truncations across all 1,534 orders, including the 154,440-character maximum.
 ### What the dataset shows
 
 Verified against `data/eo.db` (run 11). These are sanity checks on the extraction,
-not a finished analysis — the notebook is deferred, and the caveats below are real.
+not a finished analysis — that is `notebooks/analysis.ipynb` — and the caveats
+below are real.
 
 **Orders per active year.** Trump's two terms are non-contiguous, so a first-to-last
 date span attributes 2021–24 to him and understates the rate. Counting only calendar

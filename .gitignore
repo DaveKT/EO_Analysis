@@ -27,3 +27,4 @@ data/*
 .env
 my_secrets.py
 .DS_Store
+.ipynb_checkpoints
