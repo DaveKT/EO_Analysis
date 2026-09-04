@@ -91,8 +91,8 @@ authorities          1,707  id PK -> orders
 relationships        5,765  id PK -> orders, target_document_number -> orders
 raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
 review_queue           866  id PK -> orders
-agencies               558  canonical agencies
-agency_mentions      5,863  (claim_table, claim_id) -> agencies, many-to-many
+agencies               598  canonical agencies
+agency_mentions      5,862  (claim_table, claim_id) -> agencies, many-to-many
 ```
 
 Three views come with it: `revocation_network` (both endpoints resolved to real
@@ -136,7 +136,10 @@ Three things to know before writing queries against it:
   `fr_disposition_note` instead. The working database stores both in one column,
   which makes a groundedness check over the joined table read ~70% instead of
   100%. Splitting them is why this database can verify its own central claim:
-  joining `all_claims` to `order_text` gives **8,989/8,989 = 100%**.
+  every one of the **8,989** rows in `all_claims` is grounded in its order's
+  `body_text`. Re-check it with `eo.grounding.is_grounded` (recipe in
+  DATA_QUALITY §9) — not with a plain SQL `instr()`, which reads 421 of 8,989
+  because the Federal Register's typography differs from the model's.
 - **`target_document_number` is NULL for ~21% of relationship targets.** Those
   point at pre-1994 orders outside the Federal Register's full-text coverage.
   `target_eo_number` is still populated, so an unresolvable target is visibly
@@ -152,7 +155,7 @@ The extraction records agencies as each order names them — which is correct, s
 the `source_quote` has to match the text — but that left 1,146 distinct names over
 3,195 taskings, with `Secretary of the Treasury` (91) and `Department of the
 Treasury` (66) as separate entities. `agencies` + `agency_mentions` resolve them to
-**558 canonical entities**, covering **83% of mentions** by the alias table.
+**598 canonical entities**, covering **82% of mentions** by the alias table.
 
 ```sql
 SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
@@ -193,6 +196,12 @@ Four rules govern the mapping, each because the obvious approach is wrong:
   two orders' "Task Force" are different task forces. They carry
   `kind = 'generic'` (44 entities, 262 mentions) so you can exclude them in one
   predicate; collapsing them would invent a body spanning unrelated orders.
+- **A title that contains an office is not that office.** "President's Council
+  of Advisors on Science and Technology" and "Assistant to the President for
+  Domestic Policy" are not the President. The bare `President` alias is guarded
+  against possessives and against "to the President" titles; before the guard,
+  105 of the 193 mentions credited to the President were bodies and officials
+  named after the office, which put the President second in every ranking.
 
 `Secretary of X` and `Department of X` are merged — one institution for the
 purpose of counting. **`Department of War` resolves to `Department of Defense`**

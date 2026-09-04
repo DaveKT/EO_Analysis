@@ -156,7 +156,24 @@ _CANONICAL: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("assistant to the president for national security affairs", "apnsa")),
     ("Assistant to the President for Science and Technology", OFFICIAL,
      ("assistant to the president for science and technology", "apst")),
-    ("The President", OFFICIAL, ("the president", "president")),
+    ("Assistant to the President for Domestic Policy", OFFICIAL,
+     ("assistant to the president for domestic policy", "apdp")),
+    ("Assistant to the President for Economic Policy", OFFICIAL,
+     ("assistant to the president for economic policy", "apep")),
+    ("Assistant to the President for Homeland Security and Counterterrorism", OFFICIAL,
+     ("assistant to the president for homeland security and counterterrorism",
+      "assistant to the president for homeland security", "aphs/ct", "aphs ct")),
+    ("Assistant to the President for Intergovernmental Affairs", OFFICIAL,
+     ("assistant to the president for intergovernmental affairs",)),
+    ("Assistant to the President for Legislative Affairs", OFFICIAL,
+     ("assistant to the president for legislative affairs",)),
+    ("Counsel to the President", OFFICIAL, ("counsel to the president",)),
+    # The bare "president" alias is guarded (see _GUARDED): it must not fire
+    # inside "President's Council on ...", "Assistant to the President for ...",
+    # or "President of the Export-Import Bank". Those are other entities, and
+    # before the guard 105 of 193 mentions credited to the President were them.
+    ("The President", OFFICIAL,
+     ("president of the united states", "office of the president", "president")),
     ("Vice President", OFFICIAL, ("vice president",)),
 
     # Added 2026-09-04 from the unmatched tail. The ones that matter most are
@@ -245,6 +262,16 @@ _ALIASES: list[tuple[str, str]] = sorted(
     ((alias, name) for name, _, aliases in _CANONICAL for alias in aliases),
     key=lambda pair: -len(pair[0]),
 )
+
+# Aliases that are a substring of unrelated titles get an extra guard. The bare
+# "president" must not match when it is the object of a title ("Assistant to
+# the President for ...", "Counsel to the President") or the head of another
+# institution's title ("President of the Export-Import Bank"). Possessives
+# ("President's Council ...") are handled by the boundary itself, which treats
+# an apostrophe as part of the word.
+_GUARDED: dict[str, tuple[str, str]] = {
+    "president": (r"(?<!to the )", r"(?! of )"),
+}
 KINDS: dict[str, str] = {name: kind for name, kind, _ in _CANONICAL}
 
 # Tokens that carry no restriction: a name built only from these means
@@ -277,7 +304,10 @@ _GENERIC_REFERENCE_TOKENS = frozenset({
 })
 
 _PAREN_RE = re.compile(r"\([^)]*\)")
-_NON_WORD_RE = re.compile(r"[^a-z0-9 ]+")
+# Apostrophes survive cleaning so that a possessive stays attached to its word:
+# "president's council" must not expose a bare "president" to the alias scan.
+_NON_WORD_RE = re.compile(r"[^a-z0-9' ]+")
+_STRAY_APOSTROPHE_RE = re.compile(r"(?<![a-z0-9])'|'(?![a-z0-9])")
 _WS_RE = re.compile(r"\s+")
 
 
@@ -292,6 +322,7 @@ def clean(raw: str) -> str:
     text = text.replace("’", "'").replace("‘", "'")
     text = _PAREN_RE.sub(" ", text).lower()
     text = _NON_WORD_RE.sub(" ", text)
+    text = _STRAY_APOSTROPHE_RE.sub(" ", text)
     text = _WS_RE.sub(" ", text).strip()
     for prefix in ("the ", "u s ", "us "):
         text = text.removeprefix(prefix)
@@ -313,8 +344,13 @@ def is_generic_collective(text: str) -> bool:
     return all(token in _GENERIC_TOKENS for token in tokens)
 
 
+def _alias_pattern(alias: str) -> str:
+    before, after = _GUARDED.get(alias, ("", ""))
+    return rf"(?<![a-z0-9']){before}{re.escape(alias)}{after}(?![a-z0-9'])"
+
+
 def _word_bounded(alias: str, text: str) -> bool:
-    return re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", text) is not None
+    return re.search(_alias_pattern(alias), text) is not None
 
 
 def resolve(raw: str) -> tuple[list[str], bool]:
@@ -337,9 +373,7 @@ def resolve(raw: str) -> tuple[list[str], bool]:
         if _word_bounded(alias, remaining):
             found.append(canonical)
             # Blank the matched span so a shorter alias cannot re-match inside it.
-            remaining = re.sub(
-                rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", " ", remaining
-            )
+            remaining = re.sub(_alias_pattern(alias), " ", remaining)
     if found:
         return found, True
     if is_generic_collective(text):
@@ -352,9 +386,14 @@ def title_case(text: str) -> str:
     small = {"of", "the", "and", "for", "on", "in", "to", "a", "an"}
     words = text.split()
     return " ".join(
-        word.capitalize() if i == 0 or word not in small else word
+        _capitalize(word) if i == 0 or word not in small else word
         for i, word in enumerate(words)
     )
+
+
+def _capitalize(word: str) -> str:
+    """Capitalise the first letter only, so "president's" is "President's"."""
+    return word[:1].upper() + word[1:]
 
 
 def is_generic_reference(text: str) -> bool:

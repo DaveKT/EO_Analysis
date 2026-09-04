@@ -33,7 +33,7 @@ list of traps — *the first thing to read before querying*;
 | 4b Frontier comparison | done | run 10, `openai/gpt-5.4`, 36 orders, $0.85 |
 | 5 Full sweep | done | run 11, 1,534 orders, $1.05, ~2h50m, 7/8 gates |
 | 5b Export | done | `eo export` (CSV) and `eo analysis-db` (SQLite) |
-| 5c Agency normalisation | done | 1,146 raw names -> 558 canonical, 83% matched |
+| 5c Agency normalisation | done | 1,146 raw names -> 598 canonical, 82% matched |
 | 5d Documentation | done | quality, dictionary + ERD, cheat sheet |
 | 5f Publication | done | `data/analysis.db` + `data/export/` committed |
 | 5e Notebook | deferred | by decision; findings are in the README |
@@ -162,7 +162,7 @@ PYTHONPATH=src .venv/bin/python -m eo.cli review     --run-id 11   # 866 flagged
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
 PYTHONPATH=src .venv/bin/python -m eo.cli analysis-db --run-id 11  # rebuild the DB
 PYTHONPATH=src .venv/bin/python -m eo.cli export      --run-id 11  # rebuild the CSVs
-PYTHONPATH=src .venv/bin/python -m pytest -q                       # 177 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                       # 188 tests
 ```
 
 `PYTHONPATH=src` is required on this machine: files in the venv carry the macOS
@@ -191,12 +191,15 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    results are recorded in the README under "What the dataset shows". Anyone
    picking this up: install the four deps and execute the notebook, or do not ship
    one.
-6. ~~Normalise agency names~~ **Done 2026-09-04.** 1,146 raw names resolve to 558
-   canonical entities, 83% of mentions matched. The alias table was extended on
+6. ~~Normalise agency names~~ **Done 2026-09-04.** 1,146 raw names resolve to 598
+   canonical entities, 82% of mentions matched. The alias table was extended on
    2026-09-04 with 31 standing agencies, and bare in-document references
    ("Task Force", "the Commission") carry `kind='generic'` so they can be excluded
-   without being merged. What remains unmatched is 714 mentions across 439
-   genuinely one-off named bodies, which are correct as they stand. `Department of War` merges into
+   without being merged. What remains unmatched is 772 mentions across 473
+   genuinely one-off named bodies, which are correct as they stand. The bare
+   `President` alias was guarded later the same day: it had absorbed 105
+   mentions of "President's Council on ..." bodies and "Assistant to the
+   President for ..." officials. `Department of War` merges into
    `Department of Defense` per the user's decision on 2026-09-04 (EO 14347 renamed
    it; it is one institution), with the period recoverable from `raw_name`.
 7. **Analysis is the next phase**, against `data/analysis.db`. Nothing on the data
@@ -223,7 +226,7 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
   pile of new categories. ~40 of the 112 `other` rows had a correct category
   available and did not use it, so the dominant fix is prompt clarity. A re-sweep
   costs ~$1.05.
-- ~~Extend the agency alias table~~ **Done 2026-09-04**; 83% matched, residual
+- ~~Extend the agency alias table~~ **Done 2026-09-04**; 82% matched, residual
   explained.
 - Pre-1994 backfill from NARA disposition tables; `eo fetch --since`.
 

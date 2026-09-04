@@ -139,7 +139,7 @@ to a duration, and the subset is not random — round "within 90 days" phrasings
 parse, discursive ones do not. Say "parseable deadlines". The count moves with
 how you define a duration (DATA_QUALITY §6.5 pins it) — quote "about 40%".
 
-**17% of agency mentions are unmatched**, but that is mostly correct: 714
+**18% of agency mentions are unmatched**, but that is mostly correct: 772
 mentions are genuine one-off commissions and task forces that *should* be their
 own entities. `agencies.matched = 0` marks them.
 
@@ -160,10 +160,18 @@ of 100%.
 
 ## Sanity checks before you publish
 
-```sql
--- 1. every stored quote is in its order's text. Expect 8,989 of 8,989.
-SELECT COUNT(*) FROM all_claims c JOIN order_text t USING (document_number);
+```python
+# 1. every stored quote is in its order's text. Expect 8989 / 8989.
+#    Not a SQL instr(): Federal Register typography makes that read 421.
+import sqlite3
+from eo.grounding import is_grounded     # PYTHONPATH=src
+rows = sqlite3.connect("data/analysis.db").execute(
+    "SELECT c.source_quote, t.body_text FROM all_claims c JOIN order_text t USING (document_number)"
+).fetchall()
+print(sum(is_grounded(q, b) for q, b in rows), "/", len(rows))
+```
 
+```sql
 -- 2. which model produced this, and when
 SELECT model, prompt_version, cost_usd, coverage FROM run_metadata;
 

@@ -307,20 +307,20 @@ assert what a later order will do to it.
 > it. The working database stores both in one column; joining that naively makes
 > a groundedness check read ~70% instead of 100%.
 
-### `agencies` — 558 rows
+### `agencies` — 598 rows
 
-Canonical agency identities. 83% of mentions resolve to a known agency; the rest
+Canonical agency identities. 82% of mentions resolve to a known agency; the rest
 keep their cleaned surface form.
 
 | Column | Type | Notes |
 |---|---|---|
 | `agency_id` | INTEGER | **PK** |
 | `canonical_name` | TEXT | **UNIQUE** |
-| `kind` | TEXT | `body` 439, `office` 51, `generic` 44, `department` 18, `official` 5, `collective` 1 |
+| `kind` | TEXT | `body` 473, `office` 51, `generic` 44, `department` 18, `official` 11, `collective` 1 |
 | `matched` | INTEGER | 1 if the alias table recognised the name, else 0 |
 | `note` | TEXT | set on `Department of Defense` only, recording the 2025 War rename |
 
-### `agency_mentions` — 5,863 rows
+### `agency_mentions` — 5,862 rows
 
 Bridge, **many-to-many**: one claim can name several agencies
 ("Attorney General and Secretary of Homeland Security" credits both).
@@ -377,10 +377,10 @@ tables, quote trimmed), `relationship` 63 (model contradicted FR),
 **Count agencies with this, not with `agencies_tasked.agency_name`** — the latter
 splits Treasury across `Secretary of the Treasury` and `Department of the
 Treasury`. Joins `agency_mentions` → `agencies` → the claim → `orders`, so every
-row carries president, date, topic and instrument. 5,863 rows.
+row carries president, date, topic and instrument. 5,862 rows.
 
 > **Rank by `COUNT(DISTINCT document_number)`, not by row count.** The view
-> unions two claim types — `agencies_tasked` (3,627 rows) and `deadlines` (2,236)
+> unions two claim types — `agencies_tasked` (3,626 rows) and `deadlines` (2,236)
 > — and **30% of (agency, order) pairs appear in both**, so a row count records
 > the same obligation twice. Filter `claim_table` if you want one kind only, and
 > exclude `kind IN ('collective', 'generic')`, which are not cross-order entities.
@@ -413,9 +413,18 @@ Every quoted claim in one shape — `claim_table`, `id`, `document_number`,
 `claim`, `source_quote`, `quote_trimmed`. 8,989 rows. Federal Register
 relationship rows are absent by construction, since they have no `source_quote`.
 
-```sql
--- re-verify the dataset's central contract: expect 8,989 of 8,989
-SELECT COUNT(*) FROM all_claims c JOIN order_text t USING (document_number);
+Re-verifying the dataset's central contract needs the normaliser that defines
+"appears" (DATA_QUALITY §2); a SQL `instr()` over the raw text reads 421 of
+8,989 because of Federal Register typography:
+
+```python
+# expect 8989 / 8989 -- run with PYTHONPATH=src
+import sqlite3
+from eo.grounding import is_grounded
+rows = sqlite3.connect("data/analysis.db").execute(
+    "SELECT c.source_quote, t.body_text FROM all_claims c JOIN order_text t USING (document_number)"
+).fetchall()
+print(sum(is_grounded(q, b) for q, b in rows), "/", len(rows))
 ```
 
 ---

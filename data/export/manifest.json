@@ -9,13 +9,13 @@
   "cost_usd": 1.046425773000001,
   "notes": null,
   "format": "csv",
-  "exported_at": "2026-09-04T14:59:18+00:00",
+  "exported_at": "2026-09-04T21:05:55+00:00",
   "row_counts": {
     "orders": 1534,
     "agencies_tasked": 3195,
     "deadlines": 2240,
     "authorities": 1707,
-    "relationships": 5771,
+    "relationships": 5765,
     "review_queue": 866
   },
   "coverage": "Executive Orders with full text in the Federal Register API, which begins ~1994. Orders below EO 12890 are not included.",

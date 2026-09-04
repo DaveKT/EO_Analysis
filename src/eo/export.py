@@ -48,6 +48,8 @@ def tables(run_id: int) -> list[Table]:
     `relationships` deliberately includes the Federal Register's own seeded
     edges (`run_id IS NULL`) alongside the model's. Dropping them would export a
     weaker graph than the project actually has, and `source` distinguishes them.
+    They are scoped to documents the run extracted, so the export and
+    `eo analysis-db` describe the same graph.
     """
     return [
         Table(
@@ -99,7 +101,9 @@ def tables(run_id: int) -> list[Table]:
                    t.target_type, t.target_label, t.in_part, t.source,
                    t.source_quote, t.quote_trimmed
             FROM relationships t JOIN documents d USING (document_number)
-            WHERE t.run_id = :run_id OR (t.run_id IS NULL AND :include_fr)
+            WHERE t.run_id = :run_id
+               OR (t.run_id IS NULL AND :include_fr AND t.document_number IN
+                   (SELECT document_number FROM extractions WHERE run_id = :run_id))
             ORDER BY d.eo_number, t.relation
             """,
         ),
@@ -108,7 +112,7 @@ def tables(run_id: int) -> list[Table]:
             """
             SELECT d.eo_number, q.document_number, q.kind, q.detail, q.created_at
             FROM review_queue q JOIN documents d USING (document_number)
-            WHERE q.run_id = :run_id ORDER BY q.kind, d.eo_number
+            WHERE q.run_id = :run_id ORDER BY q.kind, d.eo_number, q.rowid
             """,
         ),
     ]

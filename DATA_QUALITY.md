@@ -40,10 +40,13 @@ Each extracted agency tasking, deadline, authority and relationship stores a
 is the mechanism that would have caught v1's headline failure automatically.
 
 - **8,989 / 8,989 stored quotes (100%)** appear in their order's `body_text`.
-- The check is reproducible inside `analysis.db` alone: join `all_claims` to
-  `order_text`. This is deliberate — a dataset that asserts its quotes are
-  verified but does not ship the means to re-verify them is asking for trust it
-  has not earned.
+- The check is reproducible from `analysis.db` alone, with the recipe in §9.
+  This is deliberate — a dataset that asserts its quotes are verified but does
+  not ship the means to re-verify them is asking for trust it has not earned.
+  **"Appears" is defined by `grounding.normalize`**, not by a SQL substring
+  test: a plain `instr(body_text, source_quote)` reads 421 of 8,989, because
+  the Federal Register's quotation marks, dashes and line breaks differ from
+  what the model typed. The normaliser folds typography and nothing else.
 - Matching is forgiving about typography and strict about words. Federal Register
   text renders quotation marks as `` and ``, and uses several Unicode dashes; on
   an early run, 30 of 41 apparent failures were punctuation, not drift.
@@ -245,12 +248,12 @@ deduplicated figure is 106).
 `relationships` directly, **add that predicate yourself** or you will
 double-count.
 
-### 6.4 Agency names: 83% resolved, and the residual is explainable
+### 6.4 Agency names: 82% resolved, and the residual is explainable
 
 1,146 distinct names covered 3,195 taskings before normalisation, with
 `Secretary of the Treasury` and `Department of the Treasury` as separate
-entities. `agencies` + `agency_mentions` resolve these to 558 canonical entities
-and **83% of mentions match a known agency**.
+entities. `agencies` + `agency_mentions` resolve these to 598 canonical entities
+and **82% of mentions match a known agency**.
 
 The residual is not one problem, and it is mostly not a problem at all:
 
@@ -259,11 +262,11 @@ The residual is not one problem, and it is mostly not a problem at all:
 | `department` | 18 | 2,699 | the executive departments |
 | `office` | 51 | 1,135 | standing agencies, offices, councils |
 | `collective` | 1 | 784 | "all federal agencies" and its phrasings |
-| `body` | 439 | 714 | **genuine one-off** commissions, task forces, boards |
-| `official` | 5 | 269 | named White House officials |
+| `body` | 473 | 772 | **genuine one-off** commissions, task forces, boards |
+| `official` | 11 | 210 | the President and named White House officials |
 | `generic` | 44 | 262 | **bare in-document references** — see below |
 
-The 714 `body` mentions are *correct as they stand*: they are real, distinct,
+The 772 `body` mentions are *correct as they stand*: they are real, distinct,
 one-off entities that should each be countable, not variants of anything.
 
 **`generic` is the one to know about.** "Task Force", "the Commission", "Board",
@@ -292,6 +295,12 @@ Judgment calls baked in, which you may disagree with:
 - Military departments (Army, Navy, Air Force) stay **separate** from Defense.
 - `each federal agency` is the collective; `all contracting agencies` is **not**,
   because it names a subset.
+- `The President` means the President. "President's Council on ...", "Assistant
+  to the President for ...", "Counsel to the President" and "President of the
+  Export-Import Bank" are their own entities. Before this guard (fixed
+  2026-09-04) the bare alias absorbed them: 105 of the 193 mentions credited to
+  the President were other bodies, which ranked the President second among all
+  agencies. The true figure is 92 mentions in 78 orders.
 
 `agencies_tasked.agency_name` is never overwritten, so any of these is reversible
 without re-extracting.
@@ -406,12 +415,21 @@ A checklist for not overstating what is here.
 PYTHONPATH=src .venv/bin/python -m eo.cli validate --run-id 11   # the eight gates
 PYTHONPATH=src .venv/bin/python -m eo.cli review   --run-id 11   # the 866 flagged items
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
-PYTHONPATH=src .venv/bin/python -m pytest -q                     # 177 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                     # 188 tests
 ```
 
-```sql
--- every stored quote really is in its order's text: expect 8,989 / 8,989
-SELECT COUNT(*) FROM all_claims c JOIN order_text t USING (document_number);
+Every stored quote really is in its order's text. The join below only proves
+that every claim *has* a text; the grounding test is the Python line, because
+"appears" means "appears once typography is normalised" (§2):
+
+```python
+# expect 8989 / 8989 -- run with PYTHONPATH=src
+import sqlite3
+from eo.grounding import is_grounded
+rows = sqlite3.connect("data/analysis.db").execute(
+    "SELECT c.source_quote, t.body_text FROM all_claims c JOIN order_text t USING (document_number)"
+).fetchall()
+print(sum(is_grounded(q, b) for q, b in rows), "/", len(rows))
 ```
 
 Related: **[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** for the

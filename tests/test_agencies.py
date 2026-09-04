@@ -194,3 +194,48 @@ def test_generic_references_are_not_collapsed_together():
     right; merging them would invent a body that spans unrelated orders."""
     assert agencies.resolve("Task Force")[0] != agencies.resolve("Commission")[0]
     assert agencies.resolve("Task Force")[0] == ["Task Force"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("President", "The President"),
+        ("the President", "The President"),
+        ("President of the United States", "The President"),
+        ("President (via the Secretary of Commerce)", "The President"),
+        ("Office of the President", "The President"),
+    ],
+)
+def test_the_president_resolves_from_its_own_forms(raw, expected):
+    names, matched = agencies.resolve(raw)
+    assert names == [expected]
+    assert matched
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["President's Council of Advisors on Science and Technology (PCAST)",
+     "President\u2019s Task Force on 21st Century Policing",
+     "President of the Export-Import Bank",
+     "Chair of the President's Council on Year 2000 Conversion"],
+)
+def test_the_president_does_not_absorb_bodies_named_after_the_office(raw):
+    """Before the guard, 105 of 193 mentions credited to the President were
+    councils, task forces and officials whose title merely contains the word."""
+    names, _ = agencies.resolve(raw)
+    assert "The President" not in names, names
+
+
+def test_a_presidential_assistant_is_not_the_president():
+    names, matched = agencies.resolve("Assistant to the President for Domestic Policy")
+    assert names == ["Assistant to the President for Domestic Policy"]
+    assert matched
+    names, matched = agencies.resolve("Senior Counselor to the President for Trade")
+    assert names == ["Senior Counselor to the President for Trade"]
+    assert not matched
+
+
+def test_possessives_survive_into_the_canonical_name():
+    names, matched = agencies.resolve("President's Board of Advisors on Tribal Colleges")
+    assert names == ["President's Board of Advisors on Tribal Colleges"]
+    assert not matched
