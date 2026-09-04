@@ -298,10 +298,27 @@ without re-extracting.
 
 ### 6.5 Deadlines are only 40% quantified
 
-`due_description` parses to a duration for **888 of 2,240** deadlines; `due_date`
-is populated for 1,643. Median-deadline statistics therefore describe the
-parseable subset, not all deadlines, and that subset is not random — round
+`due_description` parses to a duration for **893 of 2,240** deadlines (39.9%);
+`due_date` is populated for 1,643. Median-deadline statistics therefore describe
+the parseable subset, not all deadlines, and that subset is not random — round
 "within 90 days" phrasings parse, discursive ones do not.
+
+**There is no duration parser in the codebase**, so this figure depends entirely
+on how "parses to a duration" is defined, and earlier drafts of these documents
+quoted 886 and 888 from an ad-hoc query that no longer reproduces. The count is
+genuinely sensitive to the definition — admitting spelled-out numbers ("thirty
+days") raises it to 923. It is pinned here so it can be checked:
+
+```python
+# 893 of 2,240 (39.9%) — an Arabic numeral followed by a time unit
+import re, sqlite3
+pat = re.compile(r"\d+\s+(?:calendar |business )?(?:day|week|month|year)s?", re.I)
+rows = [r[0] or "" for r in sqlite3.connect("data/analysis.db")
+        .execute("SELECT due_description FROM deadlines")]
+print(sum(1 for d in rows if pat.search(d)), "/", len(rows))
+```
+
+Quote it as "about 40% of deadlines quantify", not as a precise count.
 
 ### 6.6 `summary` and `task` are unverified free text
 
@@ -340,8 +357,13 @@ coverage begins around 1994. The dataset runs **EO 12890 (1993-12-30) → EO 144
 **out of scope**. Sources for them: the National Archives EO Disposition Tables,
 or the American Presidency Project.
 
-Also excluded: proclamations, presidential memoranda, and 22 Federal Register
-documents (correction notices, annexes, reprints) that carry no EO number.
+Also excluded: proclamations, presidential memoranda, and 22 further Federal
+Register documents — **19 that carry no EO number** (annexes published
+separately, the odd presidential notice), plus **3 duplicate rows for orders
+already counted**: one correction notice (`C1-2009-31418`, EO 13526) and two
+originals superseded by their reprint (`2016-03141` → `R1-2016-03141`, EO 13719;
+`2026-03829` → `R1-2026-03829`, EO 14388). 1,556 fetched − 22 = the 1,534
+extracted.
 
 Presidential terms are not contiguous: **Trump appears in two separate terms**
 (2017–2021, 2025–2026), with Biden between. Deriving "orders per year" from a
@@ -384,7 +406,7 @@ A checklist for not overstating what is here.
 PYTHONPATH=src .venv/bin/python -m eo.cli validate --run-id 11   # the eight gates
 PYTHONPATH=src .venv/bin/python -m eo.cli review   --run-id 11   # the 866 flagged items
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
-PYTHONPATH=src .venv/bin/python -m pytest -q                     # 148 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                     # 177 tests
 ```
 
 ```sql

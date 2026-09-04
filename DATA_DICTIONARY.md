@@ -180,10 +180,10 @@ order-level fields side by side.
 | `fr_agencies_json` | TEXT | — | FR's agency tagging, JSON array. **Not** the model's |
 | `body_char_count` | INTEGER | — | 677 – 154,440 |
 | `summary` | TEXT | — | **model prose, unverified** |
-| `primary_topic` | TEXT | — | controlled, 15 values — see below |
+| `primary_topic` | TEXT | — | controlled, 15 values (14 domains + `other`) — see below |
 | `topic_other_reason` | TEXT | 93% | required free text when topic is `other` |
 | `secondary_topics_json` | TEXT | — | JSON array; also exploded into `order_secondary_topics` |
-| `instrument` | TEXT | — | controlled, 8 values — see below |
+| `instrument` | TEXT | — | controlled, 8 values (7 kinds + `other`) — see below |
 | `instrument_other_reason` | TEXT | 94% | as above |
 | `finish_reason` | TEXT | — | `stop` for every row; no truncations |
 
@@ -199,8 +199,11 @@ order-level fields side by side.
 `confers_status_or_honor` 10.
 
 Exactly one instrument per order, decided by a precedence rule rather than by
-emphasis: new entity → sanctions → revoke/amend → delegation → reports → pay and
-admin. See DATA_QUALITY §6.1 — `other` is above its 3% gate at 7.3%.
+emphasis, taking the first that matches: new entity → sanctions → revoke/amend →
+status/honour → delegation → reports → pay and admin. All seven steps matter —
+`confers_status_or_honor` sits at position 4, ahead of `delegates_authority`.
+[prompts.py](src/eo/prompts.py) is authoritative. See DATA_QUALITY §6.1 —
+`other` is above its 3% gate at 7.3%.
 
 ### `order_text` — 1,534 rows
 
@@ -244,7 +247,7 @@ one; 527 have none** — which is not evidence the order tasks nobody.
 |---|---|---|---|
 | `id` | INTEGER | — | **PK** |
 | `document_number` | TEXT | — | FK → `orders` |
-| `due_description` | TEXT | — | e.g. "within 90 days"; **only 40% parse to a duration** |
+| `due_description` | TEXT | — | e.g. "within 90 days"; **only ~40% parse to a duration** (893/2,240, DATA_QUALITY §6.5) |
 | `due_date` | DATE | 27% | populated for 1,643 rows |
 | `responsible_party` | TEXT | 13% | normalised via `agency_mentions` |
 | `source_quote` | TEXT | — | verbatim |

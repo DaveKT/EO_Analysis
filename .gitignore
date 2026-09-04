@@ -1,13 +1,29 @@
 .venv
 __pycache__
+.pytest_cache
+
+# v1's PDF capture (archive/Initial_EO_Research/eo_pdf_capture/EO_PDFs/) was 143
+# PDFs, ~33 MB, matched by this rule and therefore never tracked -- a fresh clone
+# never had it. It was deleted locally on 2026-09-04 during cleanup. Nothing is
+# lost: the post-mortem evidence is the tracked code and CSVs beside it
+# (get_eo.py, URLs.txt, eo_summary.csv, extract.txt), and the capture is
+# reproducible from those if it is ever wanted again.
 *.pdf
+
 # The working store stays local: eo.db holds every run and every raw model
-# response, and data/raw/ is a re-fetchable cache. The two published artefacts
-# are the analysis database and the flat-file export -- both derived from public
-# Federal Register data, both rebuildable with `eo analysis-db` / `eo export`.
+# response. The two published artefacts are the analysis database and the
+# flat-file export -- both derived from public Federal Register data, both
+# rebuildable with `eo analysis-db` / `eo export`.
+#
+# data/raw/ was the re-fetchable source-text cache (1,556 .txt files, 18 MB).
+# Deleted locally on 2026-09-04: it was byte-identical to documents.body_text in
+# eo.db, so it duplicated data already held twice over. `eo fetch` simply
+# recreates it -- ~1,556 requests at a 0.2s pause, roughly 10 minutes and no
+# model cost -- and it can also be reconstructed offline from eo.db.
 data/*
 !data/analysis.db
 !data/export/
+
 .env
 my_secrets.py
 .DS_Store

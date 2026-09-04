@@ -245,17 +245,18 @@ instead of reconstructing what FR already states.
 
 ## The extraction contract
 
-Each order is described on two axes: `primary_topic` (13 domains — what the
-order is about) and `instrument` (6 kinds — what it does).
+Each order is described on two axes: `primary_topic` (14 domains — what the
+order is about) and `instrument` (7 kinds — what it does).
 
 `instrument` is decided by an explicit **precedence rule** rather than by
 judgment about emphasis, because "the action the order is mostly devoted to"
 is not reproducible: two careful readers split on EO 13985, which both
 establishes a working group and directs government-wide equity assessments.
 The rule takes the first that matches — creates a body, imposes sanctions,
-revokes or amends, delegates authority, directs a report, adjusts pay or
-administration — and is applied to what the text says, not to what seems most
-important.
+revokes or amends, confers status or honour, delegates authority, directs a
+report, adjusts pay or administration — and is applied to what the text says,
+not to what seems most important. The order of those seven steps is the rule;
+the prompt in [prompts.py](src/eo/prompts.py) is authoritative.
 
 A `significance` field was **removed**. Asked to rate 25 orders, the model
 returned 19 `major`, 6 `substantive` and no `routine` — including a
@@ -411,7 +412,7 @@ Gates over the whole corpus, against the 100-order pilot they were tuned on:
 | truncation | 0 | 0 | 0 |
 | **`other` rate** | **≤ 3%** | **7.3% — FAILS** | 3.0% |
 | gold: primary_topic | ≥ 80% | 90% | 80% |
-| gold: instrument | ≥ 75% | 90% | 85% |
+| gold: instrument | ≥ 75% | 95% | 85% |
 | groundedness | reported | 94.0% | 94.8% |
 
 Three documents needed a second pass (two connection timeouts, one malformed
@@ -447,7 +448,7 @@ earlier transition — Obama→G.W. Bush and G.W. Bush→Clinton are 37 each. (T
 counts are deduplicated: the Federal Register and the model both assert many of
 the same edges, and an earlier version of this figure double-counted them.)
 
-**Deadlines.** 886 of 2,240 descriptions parse to a duration; medians run from 60
+**Deadlines.** 893 of 2,240 descriptions parse to a duration; medians run from 60
 days (G.W. Bush) to 135 (Obama), with 30/60/90/120/180/365 the common windows.
 
 **Most-tasked officials** are the Attorney General (92 tasks), Secretary of the
@@ -499,10 +500,11 @@ Two further honest notes:
   representative for grounding, which is a per-quote property, but not for
   vocabulary coverage, because gaps cluster in order types the sample thins out.
   Do not size a taxonomy from a pilot.
-- **The gold gates went up, not down** (topic 80% → 90%, instrument 85% → 90%) on
+- **The gold gates went up, not down** (topic 80% → 90%, instrument 85% → 95%) on
   the same model and the same prompt. That is run-to-run nondeterminism, and it is
   the same reason "all gates pass" was never claimed as a stable property. It cuts
-  both ways.
+  both ways. Both columns are scored against the same gold set (v2), so the rise
+  is not an artefact of the EO 14287 relabel.
 
 ## What went wrong in v1, and what prevents it now
 

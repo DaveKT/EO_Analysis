@@ -6,8 +6,12 @@ with `line.startswith("sentiment:")`, which markdown bold defeated: 47 of 143
 rows came back blank. Nothing here is parsed out of prose.
 
 Two axes describe each order, decided 2026-09-03 (PLAN.md section 8):
-  * `primary_topic` -- what the order is *about* (13 domains)
-  * `instrument`    -- what the order *does* (6 kinds)
+  * `primary_topic` -- what the order is *about* (14 domains + `other`)
+  * `instrument`    -- what the order *does* (7 kinds + `other`)
+Those are the sizes as shipped. The 2026-09-03 decision was 12 domains and 6
+instruments; `education`, then `tribal_affairs` and `confers_status_or_honor`,
+were added the same day (see below), and the counts here were not updated until
+2026-09-04.
 The second axis exists because this corpus is not shaped like a generic policy
 taxonomy: roughly 200 of 1,534 orders establish councils or task forces, 78
 block property, and 49 set agency succession. Domain alone files all of those

@@ -99,8 +99,9 @@ the orders. Topic is fine at 1.8%; `instrument` carries 5.5%. Roughly 40 of the
 112 had a correct category available and did not use it.
 
 **One instrument per order, by precedence** — new body → sanctions →
-revoke/amend → delegation → reports → pay/admin. It is not "what the order is
-mostly about". A *body* requires membership; a program or Initiative is not one.
+revoke/amend → **status/honour** → delegation → reports → pay/admin. It is not
+"what the order is mostly about". A *body* requires membership; a program or
+Initiative is not one.
 
 **Gold agreement is 90% topic / 95% instrument on 20 orders** labelled by a model
 and reviewed by a non-expert. A sanity check, not a precision measurement.
@@ -126,15 +127,17 @@ Clinton 34.2 · G.W. Bush 32.3 · Obama 30.7 · **Trump 71.0** · Biden 32.4
 
 **Coverage starts ~1994.** EO 12890 → EO 14423. Orders below 12890 (back to 1937)
 are **not** here. Never call this "all Executive Orders". Proclamations,
-memoranda, and 22 non-numbered FR documents are also excluded.
+memoranda, and 22 further FR documents are also excluded — 19 that carry no EO
+number, plus 3 duplicate rows for orders already in the corpus.
 
 **~21% of relationship targets do not resolve.** `target_document_number` is NULL
 where the target is a pre-1994 order or a proclamation. Say so if you present the
 network.
 
-**Only 40% of deadlines quantify.** 888 of 2,240 `due_description` values parse
+**Only 40% of deadlines quantify.** 893 of 2,240 `due_description` values parse
 to a duration, and the subset is not random — round "within 90 days" phrasings
-parse, discursive ones do not. Say "parseable deadlines".
+parse, discursive ones do not. Say "parseable deadlines". The count moves with
+how you define a duration (DATA_QUALITY §6.5 pins it) — quote "about 40%".
 
 **17% of agency mentions are unmatched**, but that is mostly correct: 714
 mentions are genuine one-off commissions and task forces that *should* be their

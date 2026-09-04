@@ -123,7 +123,7 @@ null rate               0.0%   (<= 2%)     PASS
 truncation              0      (0)         PASS
 other rate              7.3%   (<= 3%)     FAIL
 gold: primary_topic     90%    (>= 80%)    PASS
-gold: instrument        90%    (>= 75%)    PASS
+gold: instrument        95%    (>= 75%)    PASS
 groundedness            94.0%  (reported)
 ```
 
@@ -133,8 +133,10 @@ groundedness            94.0%  (reported)
   response). `eo extract --run-id 11` recovered all three for $0.0007. Timeouts
   ran at ~226 retries over the run; none exhausted 4/4 except those two.
 - **The gold gates went UP on the same model and prompt** (topic 80->90,
-  instrument 85->90). Nondeterminism cuts both ways; this is why "all gates pass"
-  is not claimed as a property.
+  instrument 85->95). Nondeterminism cuts both ways; this is why "all gates pass"
+  is not claimed as a property. Both runs are scored against gold set **v2** as it
+  stands today -- re-scoring run 9 reproduces 80%/85% -- so this is run-to-run
+  variance and not an artefact of the EO 14287 relabel.
 - **The `other` gate failure is a finding, decomposed in the README.** ~40 of the
   112 rows had a correct existing category available and did not use it (15
   honours despite `confers_status_or_honor`, 9 agency-closure orders, succession
@@ -160,7 +162,7 @@ PYTHONPATH=src .venv/bin/python -m eo.cli review     --run-id 11   # 866 flagged
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
 PYTHONPATH=src .venv/bin/python -m eo.cli analysis-db --run-id 11  # rebuild the DB
 PYTHONPATH=src .venv/bin/python -m eo.cli export      --run-id 11  # rebuild the CSVs
-PYTHONPATH=src .venv/bin/python -m pytest -q                       # 148 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                       # 177 tests
 ```
 
 `PYTHONPATH=src` is required on this machine: files in the venv carry the macOS
@@ -213,8 +215,10 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
   Federal Register wins.** Model rows superseded by an FR row carry
   `authoritative = 0`; 174 contradict FR outright. This also fixed a 27%
   overcount in `revocation_network`.
-- **Improve deadline parsing** -- only 888 of 2,240 descriptions (40%) yield a
-  duration, so median-deadline figures cover the parseable subset only.
+- **Improve deadline parsing** -- only 893 of 2,240 descriptions (40%) yield a
+  duration, so median-deadline figures cover the parseable subset only. There is
+  no parser in the codebase; the definition is pinned in DATA_QUALITY §6.5, and
+  the count moves with it (923 if spelled-out numbers count).
 - **Instrument taxonomy v8**: `continues_body` plus precedence clarity, *not* a
   pile of new categories. ~40 of the 112 `other` rows had a correct category
   available and did not use it, so the dominant fix is prompt clarity. A re-sweep
@@ -562,6 +566,16 @@ Carry this table into the README. Every v1 failure has exactly one structural fi
   the 13th domain.** Found while hand-labelling the Phase 2 fixtures: 52 orders are
   education-related (the Educational Excellence series, Tribal Colleges, HBCUs, educational
   technology, the Space Academy) and had no home. Caught before any tokens were spent.
+- ~~Final vocabulary sizes~~ **Recorded 2026-09-04.** The two entries above are the
+  2026-09-03 decision as taken; the vocabulary then grew twice more the same day, and
+  that was never written down here -- which is why README, the dictionary and
+  `models.py` disagreed about its size until 2026-09-04. **The shipped vocabulary is
+  14 domains + `other` (15 enum values) and 7 instruments + `other` (8).**
+  `tribal_affairs` and `confers_status_or_honor` were added after the 100-order run put
+  `other` at 7%, both found by the `other` gate doing its job. `confers_status_or_honor`
+  sits at **position 4** in the instrument precedence rule, between `revokes_or_amends`
+  and `delegates_authority`; three documents had omitted it from the rule entirely.
+  `models.py` and `prompts.py` are authoritative for both.
 - ~~Decide whether `significance` survives alongside `instrument`~~ **Resolved 2026-09-03:
   both are kept as separate fields.**
 - ~~Pick the sweep model at Phase 3~~ **Settled: `openai/gpt-oss-120b`**, which clears
