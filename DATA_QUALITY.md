@@ -245,14 +245,39 @@ deduplicated figure is 106).
 `relationships` directly, **add that predicate yourself** or you will
 double-count.
 
-### 6.4 Agency names: 78% resolved, 22% long tail
+### 6.4 Agency names: 83% resolved, and the residual is explainable
 
 1,146 distinct names covered 3,195 taskings before normalisation, with
 `Secretary of the Treasury` and `Department of the Treasury` as separate
-entities. `agencies` + `agency_mentions` resolve these to 621 canonical entities;
-**78% of mentions match a known agency** and the rest keep their cleaned surface
-form as an entity of their own. `agencies.matched` records which is which, so
-coverage is queryable rather than assumed.
+entities. `agencies` + `agency_mentions` resolve these to 558 canonical entities
+and **83% of mentions match a known agency**.
+
+The residual is not one problem, and it is mostly not a problem at all:
+
+| `kind` | Entities | Mentions | What it is |
+|---|---|---|---|
+| `department` | 18 | 2,699 | the executive departments |
+| `office` | 51 | 1,135 | standing agencies, offices, councils |
+| `collective` | 1 | 784 | "all federal agencies" and its phrasings |
+| `body` | 439 | 714 | **genuine one-off** commissions, task forces, boards |
+| `official` | 5 | 269 | named White House officials |
+| `generic` | 44 | 262 | **bare in-document references** — see below |
+
+The 714 `body` mentions are *correct as they stand*: they are real, distinct,
+one-off entities that should each be countable, not variants of anything.
+
+**`generic` is the one to know about.** "Task Force", "the Commission", "Board",
+"Parties to the Dispute" refer to a body created or named inside their own
+order — so two orders' "Task Force" are **different task forces**. They are
+flagged rather than merged, because collapsing them would invent a body spanning
+unrelated orders and produce a confidently wrong ranking. **Exclude them from any
+cross-order aggregate:**
+
+```sql
+SELECT canonical_name, COUNT(*) FROM agency_taskings
+WHERE kind NOT IN ('generic', 'collective')
+GROUP BY agency_id ORDER BY 2 DESC;
+```
 
 Judgment calls baked in, which you may disagree with:
 - `Secretary of X` and `Department of X` are merged as one institution.

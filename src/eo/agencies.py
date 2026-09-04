@@ -42,6 +42,7 @@ OFFICE = "office"
 OFFICIAL = "official"
 COLLECTIVE = "collective"
 BODY = "body"
+GENERIC = "generic"
 
 DEFENSE_NOTE = (
     "Executive Order 14347 (2025-09-05) renamed the Department of Defense the"
@@ -126,7 +127,7 @@ _CANONICAL: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("national security council", "nsc")),
     ("National Economic Council", OFFICE, ("national economic council", "nec")),
     ("Executive Office of the President", OFFICE,
-     ("executive office of the president", "eop")),
+     ("executive office of the president", "the white house", "white house", "eop")),
 
     ("Environmental Protection Agency", OFFICE,
      ("environmental protection agency", "administrator of the environmental protection agency",
@@ -137,13 +138,15 @@ _CANONICAL: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("small business administration", "sba")),
     ("Federal Emergency Management Agency", OFFICE,
      ("federal emergency management agency", "fema")),
-    ("Central Intelligence Agency", OFFICE, ("central intelligence agency", "cia")),
+    ("Central Intelligence Agency", OFFICE,
+     ("central intelligence agency", "director of central intelligence", "cia")),
     ("Federal Bureau of Investigation", OFFICE,
      ("federal bureau of investigation", "fbi")),
     ("National Aeronautics and Space Administration", OFFICE,
      ("national aeronautics and space administration", "nasa")),
     ("National Science Foundation", OFFICE, ("national science foundation", "nsf")),
-    ("Social Security Administration", OFFICE, ("social security administration", "ssa")),
+    ("Social Security Administration", OFFICE,
+     ("social security administration", "commissioner of social security", "ssa")),
     ("National Institutes of Health", OFFICE, ("national institutes of health", "nih")),
     ("Nuclear Regulatory Commission", OFFICE,
      ("nuclear regulatory commission", "nrc")),
@@ -155,6 +158,77 @@ _CANONICAL: tuple[tuple[str, str, tuple[str, ...]], ...] = (
      ("assistant to the president for science and technology", "apst")),
     ("The President", OFFICIAL, ("the president", "president")),
     ("Vice President", OFFICIAL, ("vice president",)),
+
+    # Added 2026-09-04 from the unmatched tail. The ones that matter most are
+    # those with variants to merge: NARA/Archivist, the FAR Council/"FAR
+    # Council", FTC/its Chairman, USPS/Postmaster General. The rest are standing
+    # federal entities that were being counted as one-off bodies, which made the
+    # `matched` coverage figure understate what the table actually knows.
+    ("National Archives and Records Administration", OFFICE,
+     ("national archives and records administration", "national archives",
+      "archivist of the united states", "archivist", "nara")),
+    ("Federal Acquisition Regulatory Council", OFFICE,
+     ("federal acquisition regulatory council", "far council",
+      "agency members of the far council")),
+    ("Federal Aviation Administration", OFFICE,
+     ("federal aviation administration", "faa administrator", "faa")),
+    ("Federal Trade Commission", OFFICE,
+     ("federal trade commission", "chairman of the federal trade commission", "ftc")),
+    ("U.S. Customs and Border Protection", OFFICE,
+     ("customs and border protection", "cbp")),
+    ("United States Agency for International Development", OFFICE,
+     ("united states agency for international development",
+      "administrator of the united states agency for international development",
+      "administrator of usaid", "usaid")),
+    ("United States Postal Service", OFFICE,
+     ("united states postal service", "postal service", "postmaster general", "usps")),
+    ("Food and Drug Administration", OFFICE,
+     ("food and drug administration", "fda commissioner", "fda")),
+    ("Securities and Exchange Commission", OFFICE,
+     ("securities and exchange commission", "sec")),
+    ("Equal Employment Opportunity Commission", OFFICE,
+     ("equal employment opportunity commission", "eeoc chair", "eeoc")),
+    ("Consumer Financial Protection Bureau", OFFICE,
+     ("consumer financial protection bureau", "cfpb")),
+    ("Federal Reserve Board", OFFICE,
+     ("federal reserve board", "board of governors of the federal reserve system")),
+    ("Federal Communications Commission", OFFICE,
+     ("federal communications commission",
+      "chairman of the federal communications commission", "fcc")),
+    ("Office of Government Ethics", OFFICE, ("office of government ethics", "oge")),
+    ("Office of Information and Regulatory Affairs", OFFICE,
+     ("office of information and regulatory affairs", "oira")),
+    ("Office of Federal Procurement Policy", OFFICE,
+     ("office of federal procurement policy",
+      "administrator for federal procurement policy", "ofpp")),
+    ("National Institute of Standards and Technology", OFFICE,
+     ("national institute of standards and technology", "nist director", "nist")),
+    ("Cybersecurity and Infrastructure Security Agency", OFFICE,
+     ("cybersecurity and infrastructure security agency", "director of cisa", "cisa")),
+    ("Information Security Oversight Office", OFFICE,
+     ("information security oversight office",
+      "director of the information security oversight office", "isoo")),
+    ("Assistant Secretary for Preparedness and Response", OFFICIAL,
+     ("assistant secretary for preparedness and response", "aspr")),
+    ("Corporation for National and Community Service", OFFICE,
+     ("corporation for national and community service",)),
+    ("National Mediation Board", OFFICE, ("national mediation board",)),
+    ("Election Assistance Commission", OFFICE, ("election assistance commission",)),
+    ("Committee on Foreign Investment in the United States", OFFICE,
+     ("committee on foreign investment in the united states", "cfius")),
+    ("Financial Stability Oversight Council", OFFICE,
+     ("financial stability oversight council", "fsoc")),
+    ("United States Fish and Wildlife Service", OFFICE,
+     ("united states fish and wildlife service", "fish and wildlife service")),
+    ("Domestic Policy Council", OFFICE, ("domestic policy council",)),
+    ("Advisory Council on Historic Preservation", OFFICE,
+     ("advisory council on historic preservation",)),
+    ("Chief Information Officers Council", OFFICE,
+     ("federal chief information officers council", "chief information officers council",
+      "cio council")),
+    ("Chief Financial Officers Council", OFFICE, ("chief financial officers council",)),
+    ("U.S. International Development Finance Corporation", OFFICE,
+     ("united states international development finance corporation",)),
 
     ("All agencies (collective)", COLLECTIVE,
      ("all executive departments and agencies", "all federal departments and agencies",
@@ -184,6 +258,23 @@ _GENERIC_TOKENS = frozenset({
     "united", "states", "us", "u", "s", "national", "relevant", "appropriate",
 })
 COLLECTIVE_NAME = "All agencies (collective)"
+
+# Bare organisational nouns with no distinguishing proper name: "Task Force",
+# "the Commission", "Parties to the Dispute". Each refers to a body created or
+# named inside its own order, so two orders' "Task Force" are different task
+# forces. They must NOT be collapsed into one entity -- that would merge
+# unrelated bodies and produce a confidently wrong ranking. They are marked
+# `generic` instead, so an analyst can exclude them with one predicate.
+_GENERIC_REFERENCE_TOKENS = frozenset({
+    "task", "force", "commission", "board", "committee", "working", "group",
+    "council", "panel", "secretary", "secretaries", "chair", "chairman",
+    "chairperson", "members", "member", "executive", "steering", "select",
+    "review", "interagency", "national", "emergency", "parties", "to", "the",
+    "dispute", "disputes", "controversy", "each", "center", "agency", "agencies",
+    "officials", "official", "branch", "government", "federal", "and", "of",
+    "subcommittee", "office", "director", "administrator", "head", "heads",
+    "commissioners", "commissioner", "staff", "department", "departments",
+})
 
 _PAREN_RE = re.compile(r"\([^)]*\)")
 _NON_WORD_RE = re.compile(r"[^a-z0-9 ]+")
@@ -266,5 +357,23 @@ def title_case(text: str) -> str:
     )
 
 
+def is_generic_reference(text: str) -> bool:
+    """Whether a cleaned name is a bare organisational noun with no proper name.
+
+    "task force" and "parties to the dispute" are; "great lakes interagency task
+    force" and "national mediation board" are not, because they carry a
+    distinguishing name.
+    """
+    tokens = text.split()
+    return bool(tokens) and all(t in _GENERIC_REFERENCE_TOKENS for t in tokens)
+
+
 def kind_of(canonical: str) -> str:
-    return KINDS.get(canonical, BODY)
+    """The kind of a canonical name, known or not.
+
+    An unrecognised name is a one-off `body` unless it is a bare in-document
+    reference, which is `generic`.
+    """
+    if canonical in KINDS:
+        return KINDS[canonical]
+    return GENERIC if is_generic_reference(clean(canonical)) else BODY

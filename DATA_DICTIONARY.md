@@ -302,20 +302,20 @@ assert what a later order will do to it.
 > it. The working database stores both in one column; joining that naively makes
 > a groundedness check read ~70% instead of 100%.
 
-### `agencies` — 621 rows
+### `agencies` — 558 rows
 
-Canonical agency identities. 44 matched the alias table; the rest keep their
-cleaned surface form.
+Canonical agency identities. 83% of mentions resolve to a known agency; the rest
+keep their cleaned surface form.
 
 | Column | Type | Notes |
 |---|---|---|
 | `agency_id` | INTEGER | **PK** |
 | `canonical_name` | TEXT | **UNIQUE** |
-| `kind` | TEXT | `body` 577, `office` 21, `department` 18, `official` 4, `collective` 1 |
+| `kind` | TEXT | `body` 439, `office` 51, `generic` 44, `department` 18, `official` 5, `collective` 1 |
 | `matched` | INTEGER | 1 if the alias table recognised the name, else 0 |
 | `note` | TEXT | set on `Department of Defense` only, recording the 2025 War rename |
 
-### `agency_mentions` — 5,785 rows
+### `agency_mentions` — 5,863 rows
 
 Bridge, **many-to-many**: one claim can name several agencies
 ("Attorney General and Secretary of Homeland Security" credits both).
@@ -375,8 +375,10 @@ Treasury`. Joins `agency_mentions` → `agencies` → the claim → `orders`, so
 row carries president, date, topic and instrument.
 
 ```sql
+-- exclude 'collective' ("all federal agencies") and 'generic' ("Task Force"),
+-- which are not cross-order entities
 SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
-FROM agency_taskings WHERE kind <> 'collective'
+FROM agency_taskings WHERE kind NOT IN ('collective', 'generic')
 GROUP BY agency_id ORDER BY taskings DESC LIMIT 10;
 ```
 

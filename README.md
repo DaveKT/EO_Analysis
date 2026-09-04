@@ -84,8 +84,8 @@ authorities          1,707  id PK -> orders
 relationships        5,765  id PK -> orders, target_document_number -> orders
 raw_quotes             540  (claim_table, claim_id) -> the claim it belongs to
 review_queue           866  id PK -> orders
-agencies               621  canonical agencies
-agency_mentions      5,785  (claim_table, claim_id) -> agencies, many-to-many
+agencies               558  canonical agencies
+agency_mentions      5,863  (claim_table, claim_id) -> agencies, many-to-many
 ```
 
 Three views come with it: `revocation_network` (both endpoints resolved to real
@@ -145,7 +145,7 @@ The extraction records agencies as each order names them — which is correct, s
 the `source_quote` has to match the text — but that left 1,146 distinct names over
 3,195 taskings, with `Secretary of the Treasury` (91) and `Department of the
 Treasury` (66) as separate entities. `agencies` + `agency_mentions` resolve them to
-**621 canonical entities**, covering **78% of mentions** by the alias table.
+**558 canonical entities**, covering **83% of mentions** by the alias table.
 
 ```sql
 SELECT canonical_name, COUNT(*) AS taskings, COUNT(DISTINCT document_number) AS orders
@@ -181,6 +181,11 @@ Four rules govern the mapping, each because the obvious approach is wrong:
 - **A qualifier is not noise.** `each federal agency` resolves to the collective;
   `all contracting agencies` does not, because it names a subset and merging it
   would claim the whole executive branch was tasked.
+- **Bare references are flagged, not merged.** "Task Force", "the Commission" and
+  "Parties to the Dispute" each refer to a body created inside their own order, so
+  two orders' "Task Force" are different task forces. They carry
+  `kind = 'generic'` (44 entities, 262 mentions) so you can exclude them in one
+  predicate; collapsing them would invent a body spanning unrelated orders.
 
 `Secretary of X` and `Department of X` are merged — one institution for the
 purpose of counting. **`Department of War` resolves to `Department of Defense`**

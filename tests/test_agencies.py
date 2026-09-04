@@ -141,3 +141,56 @@ def test_alias_matching_is_word_bounded():
     names, matched = agencies.resolve("Dodson County Advisory Board")
     assert names == ["Dodson County Advisory Board"]
     assert not matched
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Archivist", "National Archives and Records Administration"),
+        ("Archivist of the United States", "National Archives and Records Administration"),
+        ("FAR Council", "Federal Acquisition Regulatory Council"),
+        ("Chairman of the Federal Trade Commission", "Federal Trade Commission"),
+        ("Postmaster General", "United States Postal Service"),
+        ("Director of Central Intelligence", "Central Intelligence Agency"),
+        ("Administrator of USAID", "United States Agency for International Development"),
+        ("FDA Commissioner", "Food and Drug Administration"),
+        ("Commissioner of Social Security", "Social Security Administration"),
+        ("NIST Director", "National Institute of Standards and Technology"),
+    ],
+)
+def test_added_agencies_merge_their_variants(raw, expected):
+    """Each of these was splitting a standing agency across spellings."""
+    names, matched = agencies.resolve(raw)
+    assert names == [expected]
+    assert matched
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["Task Force", "the Commission", "Board", "Committee", "Working Group",
+     "Emergency Board", "Parties to the Dispute", "Interagency Working Group",
+     "Secretary", "Executive Committee"],
+)
+def test_bare_references_are_flagged_generic(raw):
+    """A bare organisational noun refers to a body created inside its own order."""
+    names, _ = agencies.resolve(raw)
+    assert agencies.kind_of(names[0]) == agencies.GENERIC
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["Great Lakes Interagency Task Force", "Water Subcabinet",
+     "Gulf Coast Ecosystem Restoration Task Force",
+     "Task Force on Environmental Health Risks and Safety Risks to Children"],
+)
+def test_named_bodies_are_not_flagged_generic(raw):
+    """A distinguishing proper name makes it a real, countable entity."""
+    names, _ = agencies.resolve(raw)
+    assert agencies.kind_of(names[0]) == agencies.BODY
+
+
+def test_generic_references_are_not_collapsed_together():
+    """Two orders' "Task Force" are different task forces. Flagging them is
+    right; merging them would invent a body that spans unrelated orders."""
+    assert agencies.resolve("Task Force")[0] != agencies.resolve("Commission")[0]
+    assert agencies.resolve("Task Force")[0] == ["Task Force"]
