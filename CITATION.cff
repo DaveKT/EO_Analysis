@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this dataset or analysis, please cite it as below."
+title: "Executive Order Analysis: a source-verified dataset of 1,534 U.S. Executive Orders (1993-2026)"
+abstract: >-
+  A source-verified, queryable dataset of 1,534 U.S. Executive Orders - every
+  order the Federal Register holds full text for, EO 12890 (December 1993)
+  through EO 14423 (August 2026), across six presidencies - with structured
+  fields extracted by a language model under a fixed schema: subject domain,
+  kind of action, tasked agencies, deadlines, invoked authorities and
+  relationships to earlier orders. Every extracted claim is tied to a quoted
+  span of the source text and verified against it. Published as SQLite and CSV
+  alongside an executed analysis notebook.
+type: dataset
+authors:
+  - family-names: Kolet-Tassara
+    given-names: David
+version: 1.0.0
+date-released: 2026-09-05
+license: MIT
+repository-code: "https://github.com/DaveKT/EO_Analysis"
+keywords:
+  - executive orders
+  - United States
+  - Federal Register
+  - public policy
+  - text extraction
+  - open data

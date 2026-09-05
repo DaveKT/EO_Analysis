@@ -191,4 +191,6 @@ gold/                 the hand-labelled gold set             tests/         194 
 archive/              version 1, kept as a post-mortem
 ```
 
-Licence for the data: the underlying text is U.S. government work in the public domain. Model-extracted fields and the analysis are provided as-is; read [docs/DATA_QUALITY.md](docs/DATA_QUALITY.md) before quoting any number.
+## Licence
+
+The code, the model-extracted fields and the analysis are released under the [MIT Licence](LICENSE). The underlying order text is U.S. government work in the public domain. Everything derived is provided as-is; read [docs/DATA_QUALITY.md](docs/DATA_QUALITY.md) before quoting any number.
