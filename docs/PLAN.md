@@ -11,13 +11,12 @@ Written 2026-09-03; updated 2026-09-04 when the data side closed.
 Four companion documents carry what this plan does not:
 **[INVESTIGATORS_CHEAT_SHEET.md](INVESTIGATORS_CHEAT_SHEET.md)** is the one-page
 list of traps — *the first thing to read before querying*;
-[README.md](README.md) is how to run it and what the dataset shows;
+[README.md](../README.md) is the project overview, method and results;
+[SETUP.md](SETUP.md) is how to install and run it;
 **[DATA_QUALITY.md](DATA_QUALITY.md)** is every control, finding and caveat —
 *read it before quoting any number*;
 **[DATA_DICTIONARY.md](DATA_DICTIONARY.md)** is the schema and ERD of
-`data/analysis.db`. Questions raised during analysis but deliberately not yet
-executed, each with its plan and cost, are parked in
-[ROUND_TWO_QUESTIONS.md](ROUND_TWO_QUESTIONS.md).
+`data/analysis.db`. All of these live in `docs/` (moved 2026-09-05).
 
 ---
 
@@ -245,6 +244,16 @@ correcting anything else: read the order, check the convention in
 - ~~Extend the agency alias table~~ **Done 2026-09-04**; 82% matched, residual
   explained.
 - Pre-1994 backfill from NARA disposition tables; `eo fetch --since`.
+- **Framing of orders ("building" vs "fixing" language): parked 2026-09-04, not
+  started.** Not as sentiment -- v1 died on exactly that, and nothing in the
+  dataset carries tone. The checkable version is a `framing` classification of
+  the Purpose/Policy preamble (935 of 1,534 orders have a titled Section 1) with
+  a mandatory quote, built as a separate pass: a 60-order hand-labelled gold set
+  first (the go/no-go), a 100-order pilot run twice to measure self-agreement,
+  ~$0.30 for a cheap-model sweep on preambles only, ~$10 on `gpt-5.4`. Explicit
+  "prior administration" language appears in only 32 orders, 29 of them Trump 47,
+  so a lexicon would detect one house style. The notebook's distinctive-vocabulary
+  table is the zero-cost proxy.
 
 ### Open risks a fresh session should not rediscover the hard way
 
@@ -338,8 +347,8 @@ want them: the National Archives EO Disposition Tables, or the American Presiden
 
 ```
 EO_Analysis/
-├── PLAN.md                    ← this file
-├── README.md                  ← what the dataset is, coverage boundary, how to run
+├── README.md                  ← overview, method, results
+├── docs/                      ← PLAN.md (this file), SETUP.md, DATA_QUALITY.md, DATA_DICTIONARY.md, cheat sheet
 ├── pyproject.toml             ← deps + pinned versions (replaces bare .venv)
 ├── .env.example               ← names only, no values
 ├── src/eo/

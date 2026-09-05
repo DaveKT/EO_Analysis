@@ -203,7 +203,7 @@ Exactly one instrument per order, decided by a precedence rule rather than by
 emphasis, taking the first that matches: new entity → sanctions → revoke/amend →
 status/honour → delegation → reports → pay and admin. All seven steps matter —
 `confers_status_or_honor` sits at position 4, ahead of `delegates_authority`.
-[prompts.py](src/eo/prompts.py) is authoritative. See DATA_QUALITY §6.1 —
+[prompts.py](../src/eo/prompts.py) is authoritative. See DATA_QUALITY §6.1 —
 `other` is above its 3% gate at 7.3%.
 
 ### `order_text` — 1,534 rows

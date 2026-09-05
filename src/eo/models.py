@@ -5,7 +5,7 @@ spec. It exists because v1 asked for prose in a fixed shape and then parsed it
 with `line.startswith("sentiment:")`, which markdown bold defeated: 47 of 143
 rows came back blank. Nothing here is parsed out of prose.
 
-Two axes describe each order, decided 2026-09-03 (PLAN.md section 8):
+Two axes describe each order, decided 2026-09-03 (docs/PLAN.md section 8):
   * `primary_topic` -- what the order is *about* (14 domains + `other`)
   * `instrument`    -- what the order *does* (7 kinds + `other`)
 Those are the sizes as shipped. The 2026-09-03 decision was 12 domains and 6
