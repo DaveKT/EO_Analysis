@@ -219,6 +219,28 @@ correct?), never **recall** (was everything extracted?).
 So: "34% of orders task no agency" is **not** a supportable finding. "The model
 extracted at least one tasked agency from 66% of orders" is.
 
+**One field now has a measured recall, and it is low.** Every order states its
+legal basis in a fixed preamble clause ("By the authority vested in me ...
+including ..."), which parses deterministically for 98.8% of orders. Checked
+against that clause (2026-09-05, `notebooks/analysis.ipynb`, "What legal
+authority do orders invoke?"), the `authorities` table names the statute in
+only a minority of the orders whose preamble invokes it:
+
+| Statute | Orders invoking it | With an `authorities` row naming it | Recall |
+|---|---|---|---|
+| International Emergency Economic Powers Act | 215 | 96 | 45% |
+| National Emergencies Act | 217 | 64 | 29% |
+| Trade Act of 1974 | 45 | 21 | 47% |
+| Immigration and Nationality Act | 71 | 14 | 20% |
+| 3 U.S.C. 301 (delegation) | 327 | 22 | 7% |
+
+Of the 683 orders whose preamble names at least one statute, 498 (73%) have any
+`authorities` row at all. **For questions about legal authority, parse the
+preamble from `order_text` rather than counting `authorities`**; the notebook
+section carries the parser and a normalisation dictionary. The table remains
+useful for what it is: precision-checked citations, including ones made in the
+body of an order rather than its preamble.
+
 ### 6.3 Relationship targets resolve only ~79% of the time
 
 | | Edges | Name an EO number | Resolve to an order here |

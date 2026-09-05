@@ -65,6 +65,13 @@ Only 192 of 1,534 orders carry any secondary topic.
 > ❌ "34% of orders task no agency."
 > ✅ "The model extracted at least one tasked agency from 66% of orders."
 
+**`authorities` has low recall, and it is now measured.** Against the preamble
+clause every order opens with, the table names IEEPA in 45% of the orders that
+invoke it, the National Emergencies Act in 29%, and 3 U.S.C. 301 in 7%. For
+"what authority do orders cite", parse the preamble from `order_text` (the
+notebook's legal-authority section does), and use `authorities` only as
+precision-checked citations. DATA_QUALITY §6.2.
+
 **259 claims are missing on purpose.** Where a quote could not be verified at
 all, the claim was dropped from the tables and recorded in `review_queue` as
 `dropped_unverifiable`. They are not in your counts.
