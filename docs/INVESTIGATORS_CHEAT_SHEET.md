@@ -1,43 +1,65 @@
 # Investigator's Cheat Sheet
 
-The traps in `data/analysis.db` that are **not** fixed in the data — you have to
-handle them in your query or your wording. One page, scannable.
+This is the one page to read before you use `data/analysis.db`. It lists the
+ways the data will fool you if you are not careful. None of these are bugs to be
+fixed; they are facts about how the data was made, and you handle them in how
+you query and how you describe what you find.
 
-Full reasoning: [DATA_QUALITY.md](DATA_QUALITY.md). Schema:
-[DATA_DICTIONARY.md](DATA_DICTIONARY.md).
+The long version, with the evidence, is [DATA_QUALITY.md](DATA_QUALITY.md). The
+list of tables and columns is [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
 ---
 
-## The four queries that are wrong by default
+## Five words you need
 
-**1. Counting agency rows double-counts.** `agency_taskings` unions agency
-taskings *and* deadline responsibilities, and **30% of (agency, order) pairs
-appear in both** — the same obligation twice. DHS looks like 357; it is 115
-orders.
+- **Order**: one executive order. There are 1,534 of them, from December 1993
+  to August 2026.
+- **The model**: the AI program (`openai/gpt-oss-120b`) that read every order
+  and filled in the fields. It is a cheap model, and it makes mistakes.
+- **Claim**: one thing the model said about an order, such as "this order
+  tasks the Treasury" or "this order sets a 90-day deadline."
+- **Quote** (`source_quote`): the exact words from the order that back up a
+  claim. Every claim has one, and every quote has been checked against the
+  order's text. This is the only part of the data that is verified.
+- **Recall**: whether the model found *everything*. It was never measured. We
+  know the claims it made are backed by quotes; we do not know what it missed.
+
+---
+
+## Four queries that give the wrong answer unless you change them
+
+**1. Counting agency rows counts the same thing twice.** The `agency_taskings`
+view lists an agency once for each task an order gives it *and* once for each
+deadline it gives it. The same job often appears both ways, so 30% of rows are
+repeats. Homeland Security shows 357 rows but appears in 115 orders.
 
 ```sql
 -- WRONG                                 -- RIGHT
 COUNT(*)                                 COUNT(DISTINCT document_number)
 ```
 
-**2. Agency rankings must exclude two kinds.** `collective` is "all federal
-agencies" (784 mentions); `generic` is bare references like "Task Force" (262).
-Neither is a cross-order entity.
+**2. Agency rankings must leave out two kinds of row.** Rows of kind
+`collective` mean "all federal agencies" (784 of them). Rows of kind `generic`
+are bare names like "the Task Force" that refer to a body created inside that
+one order (262 of them), so two orders' "Task Force" are different task forces.
+Neither is a real agency that spans orders.
 
 ```sql
 WHERE kind NOT IN ('collective', 'generic')
 ```
 
-**3. Relationships must be filtered to authoritative rows.** The Federal Register
-and the model both assert many of the same edges. Counting all 5,766 inflates the
-network by 27%.
+**3. Counting relationships double-counts unless you keep only the authoritative
+rows.** The Federal Register and the model both recorded many of the same "this
+order revokes that one" links. Counting all 5,766 rows overstates the revocation
+network by 27%. The Federal Register's row is the one to count.
 
 ```sql
-WHERE authoritative = 1     -- revocation_network already does this
+WHERE authoritative = 1     -- the revocation_network view already does this
 ```
 
-**4. `all_claims.id` is not unique across tables.** Ids restart per table and the
-ranges overlap. Always carry `claim_table`.
+**4. Claim ids repeat across tables.** An `id` of 12 exists in `agencies_tasked`,
+in `deadlines`, and in `authorities`, and they are different claims. When you
+join, always match on the table name too.
 
 ```sql
 LEFT JOIN raw_quotes q
@@ -46,137 +68,149 @@ LEFT JOIN raw_quotes q
 
 ---
 
-## Absence is not evidence of absence
+## "Not found" does not mean "not there"
 
-**Recall was never measured.** Every quality gate tests whether what was
-extracted is correct, never whether everything was extracted. There is no
-exhaustive human-annotated set to measure recall against.
+The model found at least one tasked agency in 66% of orders. That does **not**
+mean 34% of orders task nobody. It means the model did not find one, and we
+never measured how much it misses.
 
-| | Orders with ≥1 | With none |
+| The model found at least one … | in this many orders | and none in |
 |---|---|---|
 | tasked agency | 1,007 (66%) | 527 |
 | deadline | 837 (55%) | 697 |
-| authority | 1,069 (70%) | 465 |
-| model relationship | 898 (59%) | 636 |
-| **any claim at all** | 1,482 | **52** |
-
-Only 192 of 1,534 orders carry any secondary topic.
+| legal authority | 1,069 (70%) | 465 |
+| link to an earlier order | 898 (59%) | 636 |
+| claim of any kind | 1,482 | 52 |
 
 > ❌ "34% of orders task no agency."
 > ✅ "The model extracted at least one tasked agency from 66% of orders."
 
-**`authorities` has low recall, and it is now measured.** Against the preamble
-clause every order opens with, the table names IEEPA in 45% of the orders that
-invoke it, the National Emergencies Act in 29%, and 3 U.S.C. 301 in 7%. For
-"what authority do orders cite", parse the preamble from `order_text` (the
-notebook's legal-authority section does), and use `authorities` only as
-precision-checked citations. DATA_QUALITY §6.2.
+**For legal authority we did measure it, and it is low.** Every order opens with
+a sentence naming the laws it relies on. Checked against that sentence, the
+`authorities` table names the International Emergency Economic Powers Act in
+only 45% of the orders that use it, the National Emergencies Act in 29%, and
+the delegation statute (3 U.S.C. 301) in 7%. If your question is "what laws do
+orders cite", read the opening sentence from `order_text` instead; the notebook's
+legal-authority section shows how. See DATA_QUALITY §6.2.
 
-**259 claims are missing on purpose.** Where a quote could not be verified at
-all, the claim was dropped from the tables and recorded in `review_queue` as
+**259 claims were left out on purpose.** Where the model's quote could not be
+found in the order at all, the claim was dropped and logged in `review_queue` as
 `dropped_unverifiable`. They are not in your counts.
 
 ---
 
-## Fields you must not quote as evidence
+## Fields you can read but must not quote
 
-`summary`, `agencies_tasked.task`, `deadlines.due_description` are **model prose
-with no groundedness check**. Only `source_quote` is verified.
+Three fields are the model's own words, never checked against the order:
+`summary`, `agencies_tasked.task`, and `deadlines.due_description`. Only
+`source_quote` is checked.
 
-This is not theoretical. The summary of **EO 14081** names an "Interagency
-Technical Working Group" and a "Biosafety and Biosecurity Innovation Initiative"
-as bodies the order establishes. **Neither phrase appears anywhere in the
-order.** Quote `source_quote`; use `summary` to orient only.
+This matters. The summary of EO 14081 says the order creates an "Interagency
+Technical Working Group" and a "Biosafety and Biosecurity Innovation Initiative."
+Neither phrase appears anywhere in the order. Use `summary` to get your
+bearings; quote `source_quote` as evidence.
 
-**540 quotes were repaired.** `quote_trimmed = 1` means the model's quote drifted
-and was cut back to the part that verifies. The original is in `raw_quotes`. The
-model's own accuracy is 94.0%, not the 100% that stored quotes show.
-
----
-
-## Classification limits
-
-**`primary_topic` comes from a cheap model.** On the gold set, a frontier model
-assigned a more specific domain in roughly **1 case in 5** — the weak model
-defaults to `government_administration` or `foreign_policy`. This is the largest
-known quality gap in the data.
-
-**Five `primary_topic` labels are hand-corrected** (Railway Labor Act emergency
-boards, now `labor_and_workforce`). `primary_topic_as_extracted` holds the model's
-label on those rows and is NULL on every other. The rule is in
-`corrections/primary_topic.json`; a stale correction fails the build.
-
-**`other` is 7.3%, above its 3% gate** — a taxonomy limit, not a finding about
-the orders. Topic is fine at 1.8%; `instrument` carries 5.5%. Roughly 40 of the
-112 had a correct category available and did not use it.
-
-**One instrument per order, by precedence** — new body → sanctions →
-revoke/amend → **status/honour** → delegation → reports → pay/admin. It is not
-"what the order is mostly about". A *body* requires membership; a program or
-Initiative is not one.
-
-**Gold agreement is 90% topic / 95% instrument on 20 orders** labelled by a model
-and reviewed by a non-expert. A sanity check, not a precision measurement.
-
-**Results are not deterministic.** The same model and prompt scored 80% on gold
-topic in the pilot and 90% in the full sweep. Never present "all gates pass" as a
-property of the pipeline.
+**540 quotes were trimmed.** Sometimes the model quoted correctly and then
+drifted in the last few words. Those quotes were cut back to the part that
+matches the order, and `quote_trimmed = 1` marks them. The model's original
+wording is kept in `raw_quotes`. So the model's own quoting accuracy is 94%,
+even though every stored quote checks out.
 
 ---
 
-## Shape of the corpus
+## How much to trust the labels
 
-**Trump has two non-contiguous terms** (2017–21, 2025–26) with Biden between.
-A first-to-last date span attributes 2021–24 to him and understates his rate by
-about a third.
+Each order has two labels: **`primary_topic`** (what it is about, one of
+fourteen subjects) and **`instrument`** (what it does, one of seven actions).
+
+**The topic label is the weakest field.** When a stronger, more expensive model
+read the same test orders, it chose a more specific subject about one time in
+five. The cheap model tends to fall back on `government_administration` or
+`foreign_policy` when it is unsure.
+
+**Five topic labels were corrected by hand.** Five near-identical Railway Labor
+Act orders had four different labels; they are now `labor_and_workforce`. On
+those rows `primary_topic_as_extracted` holds the model's original label; it is
+empty everywhere else. The corrections and reasons are in
+`corrections/primary_topic.json`.
+
+**`other` is a gap in the menu, not a fact about the orders.** 7.3% of orders
+got `other` on one label or the other, above the 3% the project aimed for. Most
+of those had a fitting category the model did not pick. The topic label is fine
+at 1.8%; the instrument label carries 5.5%.
+
+**The instrument label follows a fixed order of tests, not a judgment about
+emphasis.** The first test that matches wins: creates a body → imposes
+sanctions → revokes or amends → confers status or honour → delegates authority →
+directs a report → adjusts pay or administration. A "body" is something with
+members, like a council or task force; a program or initiative is not one.
+
+**The labels were checked against 20 orders read by hand** and agreed 90% on
+topic and 95% on instrument. Twenty orders is a spot check, not a measurement.
+
+**The model does not give the same answer every time.** On the same 20 orders,
+the same model and prompt scored 80% one run and 90% the next. Never describe
+the checks as something the pipeline "always passes."
+
+---
+
+## Facts about the corpus that change your numbers
+
+**Trump served two separate terms** (2017–21 and 2025–26) with Biden in
+between. If you count his years from first order to last, you give him 2021–24
+too and cut his rate by a third. Count only the years in which each president
+signed, and treat the two terms separately where it matters.
 
 ```sql
--- orders per ACTIVE year
+-- orders per year in which the president actually signed
 COUNT(*) * 1.0 / COUNT(DISTINCT substr(signing_date, 1, 4))
 ```
 
-Clinton 34.2 · G.W. Bush 32.3 · Obama 30.7 · **Trump 71.0** · Biden 32.4
+Orders per active year: Clinton 34 · G.W. Bush 32 · Obama 31 · Trump 45 44 ·
+Biden 32 · Trump 47 277 orders in its first 19 months.
 
-**Coverage starts ~1994.** EO 12890 → EO 14423. Orders below 12890 (back to 1937)
-are **not** here. Never call this "all Executive Orders". Proclamations,
-memoranda, and 22 further FR documents are also excluded — 19 that carry no EO
-number, plus 3 duplicate rows for orders already in the corpus.
+**The data starts in late 1993.** The Federal Register's full text begins with
+EO 12890. Orders before that, back to 1937, are not here. Never call this "all
+executive orders." Proclamations and memoranda are not here either.
 
-**~21% of relationship targets do not resolve.** `target_document_number` is NULL
-where the target is a pre-1994 order or a proclamation. Say so if you present the
-network.
+**About one link in five points outside the data.** When an order revokes an
+order from before 1994, or a proclamation, the target is not in this database,
+so `target_document_number` is empty. The target's number is still recorded in
+`target_eo_number`. Say so if you present the revocation network.
 
-**Only 40% of deadlines quantify.** 893 of 2,240 `due_description` values parse
-to a duration, and the subset is not random — round "within 90 days" phrasings
-parse, discursive ones do not. Say "parseable deadlines". The count moves with
-how you define a duration (DATA_QUALITY §6.5 pins it) — quote "about 40%".
+**Only about 40% of deadlines have a usable number of days.** Of 2,240
+deadlines, 893 say something like "within 90 days" that can be turned into a
+number. The rest are worded in ways that cannot, and they are not a random
+sample. Say "of the deadlines that quantify," and quote "about 40%," because the
+count depends on how you define a number of days (DATA_QUALITY §6.5).
 
-**18% of agency mentions are unmatched**, but that is mostly correct: 772
-mentions are genuine one-off commissions and task forces that *should* be their
-own entities. `agencies.matched = 0` marks them.
+**18% of agency names did not match a known agency, and that is mostly fine.**
+Those 772 mentions are one-off commissions, boards and task forces that really
+are their own thing. `agencies.matched = 0` marks them.
 
 ---
 
 ## Two columns that look alike and are not
 
-| Column | Means |
+| Column | What it holds |
 |---|---|
-| `relationships.source_quote` | verbatim text **from the order** — model rows only |
-| `relationships.fr_disposition_note` | a Federal Register editorial note **about** the order — FR rows only |
+| `relationships.source_quote` | words copied **from the order** itself (model rows only) |
+| `relationships.fr_disposition_note` | a Federal Register editor's note **about** the order (Register rows only) |
 
-An FR note ("Revokes: EO 12088, October 13, 1978") appears nowhere inside the
-order. Treating them as one column makes a groundedness check read ~70% instead
-of 100%.
+A note like "Revokes: EO 12088, October 13, 1978" is the Register's summary and
+appears nowhere in the order's text. If you treat the two columns as one, a
+check that every quote is in its order drops from 100% to about 70%.
 
 ---
 
-## Sanity checks before you publish
+## Three checks to run before you publish
 
 ```python
-# 1. every stored quote is in its order's text. Expect 8989 / 8989.
-#    Not a SQL instr(): Federal Register typography makes that read 421.
+# 1. Every stored quote really is in its order. Expect 8989 / 8989.
+#    (A plain SQL text search reads 421, because the Register's punctuation
+#    differs from the model's. This uses the project's matcher instead.)
 import sqlite3
-from eo.grounding import is_grounded     # PYTHONPATH=src
+from eo.grounding import is_grounded     # run with PYTHONPATH=src
 rows = sqlite3.connect("data/analysis.db").execute(
     "SELECT c.source_quote, t.body_text FROM all_claims c JOIN order_text t USING (document_number)"
 ).fetchall()
@@ -184,13 +218,13 @@ print(sum(is_grounded(q, b) for q, b in rows), "/", len(rows))
 ```
 
 ```sql
--- 2. which model produced this, and when
+-- 2. Which model produced this, and what it covers
 SELECT model, prompt_version, cost_usd, coverage FROM run_metadata;
 
--- 3. what is already known to be imperfect, and how
+-- 3. What is already known to be imperfect
 SELECT kind, COUNT(*) FROM review_queue GROUP BY 1 ORDER BY 2 DESC;
 ```
 
-Then state, in the write-up: **which model**, **that recall is unmeasured**, and
-**the ~1994 boundary**. Those three cover most of the ways this dataset can be
-overstated.
+Then, in whatever you write, say three things: **which model made the data**,
+**that it may have missed things**, and **that the data starts in late 1993**.
+Those three cover most of the ways this dataset gets overstated.
