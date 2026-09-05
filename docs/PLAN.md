@@ -111,7 +111,8 @@ after overlap), $0.85. Reproduce with `eo compare --baseline 9 --candidate 10`.
   comparable. Any future comparison must be restricted to shared documents --
   `compare.py` enforces this, and its tests pin it.
 - Cost of sweeping the full corpus on `gpt-5.4` would be ~$36 against ~$1.00.
-  The cheap sweep remains the plan of record, with the gap recorded in the README.
+  The cheap sweep remains the plan of record, with the gap recorded in
+  [DATA_QUALITY.md](DATA_QUALITY.md) §5.
 
 ### Run 11, the full sweep -- what shipped
 
@@ -139,7 +140,7 @@ groundedness            94.0%  (reported)
   is not claimed as a property. Both runs are scored against gold set **v2** as it
   stands today -- re-scoring run 9 reproduces 80%/85% -- so this is run-to-run
   variance and not an artefact of the EO 14287 relabel.
-- **The `other` gate failure is a finding, decomposed in the README.** ~40 of the
+- **The `other` gate failure is a finding, decomposed in DATA_QUALITY §6.1.** ~40 of the
   112 rows had a correct existing category available and did not use it (15
   honours despite `confers_status_or_honor`, 9 agency-closure orders, succession
   despite `adjusts_pay_or_admin`, tariffs despite `imposes_sanctions`). Only ~16
@@ -164,12 +165,12 @@ PYTHONPATH=src .venv/bin/python -m eo.cli review     --run-id 11   # 866 flagged
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
 PYTHONPATH=src .venv/bin/python -m eo.cli analysis-db --run-id 11  # rebuild the DB
 PYTHONPATH=src .venv/bin/python -m eo.cli export      --run-id 11  # rebuild the CSVs
-PYTHONPATH=src .venv/bin/python -m pytest -q                       # 188 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                       # 194 tests
 ```
 
 `PYTHONPATH=src` is required on this machine: files in the venv carry the macOS
 `UF_HIDDEN` flag, CPython >= 3.11.4 skips hidden `.pth` files, and that silently
-voids the editable install. `chflags nohidden` does not persist. See README.
+voids the editable install. `chflags nohidden` does not persist. See [SETUP.md](SETUP.md).
 
 The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 
@@ -558,7 +559,8 @@ prices the full corpus is cheaper than v1's 143-EO GPT-4 run was.
 
 ## 7. Failure post-mortem → guardrail map
 
-Carry this table into the README. Every v1 failure has exactly one structural fix.
+This table lives in [DATA_QUALITY.md](DATA_QUALITY.md) §1 (it was in the README until
+the 2026-09-05 rewrite). Every v1 failure has exactly one structural fix.
 
 | v1 failure | Evidence | Structural fix |
 |---|---|---|

@@ -483,7 +483,7 @@ A checklist for not overstating what is here.
 PYTHONPATH=src .venv/bin/python -m eo.cli validate --run-id 11   # the eight gates
 PYTHONPATH=src .venv/bin/python -m eo.cli review   --run-id 11   # the 866 flagged items
 PYTHONPATH=src .venv/bin/python -m eo.cli compare --baseline 9 --candidate 10
-PYTHONPATH=src .venv/bin/python -m pytest -q                     # 188 tests
+PYTHONPATH=src .venv/bin/python -m pytest -q                     # 194 tests
 ```
 
 Every stored quote really is in its order's text. The join below only proves

@@ -232,9 +232,10 @@ Government administration is the largest domain for every administration, but
 each departs from the corpus average in its own direction: G.W. Bush 9 points
 above on government administration, Clinton 6 above on energy and environment,
 Trump 45 and Biden 4 above on health, Trump 47 7 above on trade — where Biden
-signed no trade order at all. On the action axis, Trump's orders are 37%
-delegations of authority against 14–23% for everyone else, and 19% creations of
-bodies against Obama's 41%.
+signed no trade order at all. On the action axis, delegations of
+authority make up 31% of Trump 45's orders and 42% of Trump 47's, against 14–23%
+for everyone else; creations of bodies are 23% and 16% of Trump's two terms
+against Obama's 41%.
 
 ### The legal basis orders claim
 
