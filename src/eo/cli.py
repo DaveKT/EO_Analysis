@@ -395,6 +395,15 @@ def review(
         typer.echo(f"   {row['detail']}")
 
 
+# Hand corrections to model output, applied when the published artefacts are
+# built and never to the run tables. See src/eo/corrections.py.
+DEFAULT_CORRECTIONS = Path("corrections/primary_topic.json")
+
+
+def _corrections_path() -> Path | None:
+    return DEFAULT_CORRECTIONS if DEFAULT_CORRECTIONS.exists() else None
+
+
 @app.command()
 def export(
     run_id: int = typer.Option(..., "--run-id", help="Run to export."),
@@ -437,7 +446,8 @@ def export(
             typer.secho(f"no such run: {run_id}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2)
         counts = export_mod.export_run(
-            con, run_id, out_dir, fmt=fmt, include_text=include_text
+            con, run_id, out_dir, fmt=fmt, include_text=include_text,
+            corrections_path=_corrections_path(),
         )
 
     typer.echo(f"exported run {run_id} to {out_dir}/ as {fmt}")
@@ -583,7 +593,9 @@ def analysis_db(
     target = Path(out)
     with db.session(settings.db_path) as con:
         try:
-            counts = analysis_db_mod.build(con, target, run_id)
+            counts = analysis_db_mod.build(
+                con, target, run_id, corrections_path=_corrections_path()
+            )
         except ValueError as exc:
             typer.secho(str(exc), fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2) from exc

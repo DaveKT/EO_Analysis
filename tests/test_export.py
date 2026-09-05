@@ -137,3 +137,20 @@ def test_orders_without_extractions_are_not_exported(con, tmp_path):
     rows = read_csv(tmp_path / "orders.csv")
 
     assert [r["eo_number"] for r in rows] == ["100"]
+
+
+def test_a_hand_correction_is_exported_with_the_original_beside_it(con, tmp_path):
+    import json
+    fixes = tmp_path / "primary_topic.json"
+    fixes.write_text(json.dumps({
+        "field": "primary_topic",
+        "applies_to": {"run_id": 1, "model": "cheap/model", "prompt_version": "v7"},
+        "corrections": [{"eo_number": 100, "from": "health", "to": "trade", "reason": "t"}],
+    }))
+    export.export_run(con, 1, tmp_path / "out", corrections_path=fixes)
+    (row,) = read_csv(tmp_path / "out" / "orders.csv")
+    assert (row["primary_topic"], row["primary_topic_as_extracted"]) == ("trade", "health")
+    # The other run is untouched, and the column is present but empty.
+    export.export_run(con, 2, tmp_path / "out2", corrections_path=fixes)
+    (row,) = read_csv(tmp_path / "out2" / "orders.csv")
+    assert (row["primary_topic"], row["primary_topic_as_extracted"]) == ("health", "")

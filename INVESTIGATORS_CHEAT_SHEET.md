@@ -94,6 +94,11 @@ assigned a more specific domain in roughly **1 case in 5** — the weak model
 defaults to `government_administration` or `foreign_policy`. This is the largest
 known quality gap in the data.
 
+**Five `primary_topic` labels are hand-corrected** (Railway Labor Act emergency
+boards, now `labor_and_workforce`). `primary_topic_as_extracted` holds the model's
+label on those rows and is NULL on every other. The rule is in
+`corrections/primary_topic.json`; a stale correction fails the build.
+
 **`other` is 7.3%, above its 3% gate** — a taxonomy limit, not a finding about
 the orders. Topic is fine at 1.8%; `instrument` carries 5.5%. Roughly 40 of the
 112 had a correct category available and did not use it.

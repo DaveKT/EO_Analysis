@@ -210,6 +210,17 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 7. **Analysis is the next phase**, against `data/analysis.db`. Nothing on the data
    side is blocking it.
 
+### Hand corrections (added 2026-09-05)
+
+Model output in the run tables is never edited. Corrections live in
+`corrections/primary_topic.json` and are applied when `analysis.db` and the export
+are built, with the model's label kept in `primary_topic_as_extracted`. A
+correction must match the model's current label or the build fails, and it is
+pinned to one run. Five Railway Labor Act emergency-board orders were relabelled
+`labor_and_workforce` this way, found by the notebook's text audit. Before
+correcting anything else: read the order, check the convention in
+`gold/gold_set.json`, and record the reason in the file.
+
 ### Still open, in rough priority order
 
 - ~~The three contested gold `instrument` labels~~ **Resolved 2026-09-04 by

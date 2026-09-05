@@ -35,7 +35,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from eo import agencies
+from eo import agencies, corrections
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -74,6 +74,9 @@ CREATE TABLE orders (
   body_char_count         INTEGER,
   summary                 TEXT,
   primary_topic           TEXT,
+  -- The model's label where a hand correction replaced it (corrections/
+  -- primary_topic.json); NULL everywhere else. The reason lives in that file.
+  primary_topic_as_extracted TEXT,
   topic_other_reason      TEXT,
   secondary_topics_json   TEXT,
   instrument              TEXT,
@@ -392,7 +395,10 @@ def _resolve_agencies(out: sqlite3.Connection) -> dict[str, int]:
 
 
 def build(
-    source: sqlite3.Connection, target_path: Path, run_id: int
+    source: sqlite3.Connection,
+    target_path: Path,
+    run_id: int,
+    corrections_path: Path | None = None,
 ) -> dict[str, int]:
     """Write a fresh analysis database for `run_id`. Returns row counts.
 
@@ -414,6 +420,9 @@ def build(
     ).fetchone()
     if run is None:
         raise ValueError(f"no such run: {run_id}")
+    fixes = corrections.load_for_run(
+        corrections_path, run_id, run["model"], run["prompt_version"]
+    )
 
     # --- orders + text + secondary topics ------------------------------------
     orders = _rows(
@@ -432,26 +441,33 @@ def build(
         """,
         params,
     )
+    fixed = corrections.verified(fixes, {r["eo_number"]: r["primary_topic"] for r in orders})
+
+    def topic(r: sqlite3.Row) -> tuple[str, str | None]:
+        fix = fixed.get(r["eo_number"])
+        return (fix.to_value, r["primary_topic"]) if fix else (r["primary_topic"], None)
+
     out.executemany(
         "INSERT INTO orders (document_number, eo_number, title, president,"
         " signing_date, publication_date, citation, pdf_url, raw_text_url,"
         " disposition_notes, fr_agencies_json, body_char_count, summary,"
-        " primary_topic, topic_other_reason, secondary_topics_json, instrument,"
-        " instrument_other_reason, finish_reason)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " primary_topic, primary_topic_as_extracted, topic_other_reason,"
+        " secondary_topics_json, instrument, instrument_other_reason, finish_reason)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [
             (
                 r["document_number"], r["eo_number"], r["title"], r["president"],
                 r["signing_date"], r["publication_date"], r["citation"],
                 r["pdf_url"], r["raw_text_url"], r["disposition_notes"],
                 r["fr_agencies_json"], r["body_char_count"], r["summary"],
-                r["primary_topic"], r["topic_other_reason"], r["secondary_topics"],
+                *topic(r), r["topic_other_reason"], r["secondary_topics"],
                 r["instrument"], r["instrument_other_reason"], r["finish_reason"],
             )
             for r in orders
         ],
     )
     counts["orders"] = len(orders)
+    counts["topic_corrections"] = len(fixed)
 
     out.executemany(
         "INSERT INTO order_text (document_number, body_text, body_char_count)"

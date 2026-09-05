@@ -180,18 +180,19 @@ order-level fields side by side.
 | `fr_agencies_json` | TEXT | — | FR's agency tagging, JSON array. **Not** the model's |
 | `body_char_count` | INTEGER | — | 677 – 154,440 |
 | `summary` | TEXT | — | **model prose, unverified** |
-| `primary_topic` | TEXT | — | controlled, 15 values (14 domains + `other`) — see below |
+| `primary_topic` | TEXT | — | controlled, 15 values (14 domains + `other`) — see below. **5 rows hand-corrected**; see next column |
+| `primary_topic_as_extracted` | TEXT | 99.7% | the model's label where a hand correction replaced it (`corrections/primary_topic.json`), NULL everywhere else |
 | `topic_other_reason` | TEXT | 93% | required free text when topic is `other` |
 | `secondary_topics_json` | TEXT | — | JSON array; also exploded into `order_secondary_topics` |
 | `instrument` | TEXT | — | controlled, 8 values (7 kinds + `other`) — see below |
 | `instrument_other_reason` | TEXT | 94% | as above |
 | `finish_reason` | TEXT | — | `stop` for every row; no truncations |
 
-**`primary_topic`** (count): `government_administration` 399,
-`energy_and_environment` 189, `foreign_policy` 174, `technology_and_research` 131,
-`justice_and_law_enforcement` 130, `health` 108, `security_and_defense` 79,
-`trade` 67, `education` 61, `labor_and_workforce` 55, `civil_rights` 44,
-`economy_and_finance` 42, **`other` 28**, `immigration` 24, `tribal_affairs` 3.
+**`primary_topic`** (count, after corrections): `government_administration` 398,
+`energy_and_environment` 189, `foreign_policy` 174, `technology_and_research` 129,
+`justice_and_law_enforcement` 129, `health` 108, `security_and_defense` 79,
+`trade` 67, `education` 61, `labor_and_workforce` 60, `civil_rights` 44,
+`economy_and_finance` 42, **`other` 27**, `immigration` 24, `tribal_affairs` 3.
 
 **`instrument`** (count): `creates_body` 435, `delegates_authority` 368,
 `revokes_or_amends` 337, `imposes_sanctions` 161, **`other` 84**,

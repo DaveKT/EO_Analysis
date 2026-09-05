@@ -176,7 +176,10 @@ columns are comparable, because both runs cover the same documents.
 
 ### 6.1 The `other` rate gate fails at 7.3% — a real finding
 
-112 of 1,534 orders answered `other` on one axis (topic 28, instrument 84). The
+112 of 1,534 orders answered `other` on one axis (topic 28, instrument 84) in
+run 11 as the model wrote it; `analysis.db` shows 27 on the topic axis after the
+hand correction in §6.8. The gate figure describes the run, not the curated
+file. The
 gate exists to make vocabulary gaps loud; this is it working. Reading all 112
 recorded reasons, the failure decomposes:
 
@@ -369,6 +372,35 @@ is retained but non-authoritative.
 
 ---
 
+### 6.8 Five topic labels are hand-corrected, and the model's label is kept
+
+The text audit in `notebooks/analysis.ipynb` ranked the orders whose body text
+disagrees most with their `primary_topic`. Five of the top twenty were Railway
+Labor Act emergency boards — near-identical boilerplate orders establishing a
+board to mediate a rail or airline labour dispute — labelled `other`,
+`government_administration`, `justice_and_law_enforcement` and twice
+`technology_and_research`, while the 26 other such orders in the corpus carry
+`labor_and_workforce`. They were relabelled on 2026-09-05.
+
+How a correction works, so it cannot become a silent patch layer:
+
+- It lives in **`corrections/primary_topic.json`**: the run it applies to, each
+  order's EO number, the value the model gave, the value it should be, and why.
+- It is applied when `analysis.db` and `data/export/` are **built**. The run
+  tables in the working store are never edited, so runs still diff cleanly.
+- The model's label is kept in **`orders.primary_topic_as_extracted`** (and the
+  same column in `orders.csv`), NULL on every uncorrected row. `SELECT ... WHERE
+  primary_topic_as_extracted IS NOT NULL` lists every correction.
+- A correction must match the model's current label exactly; a re-sweep that
+  changes it **fails the build** rather than overwriting a fresh answer. And
+  corrections are pinned to one run: building any other run applies none.
+
+The audit's review list holds other candidates (a Burma sanctions order labelled
+`other`, an opioid tariff amendment labelled `foreign_policy`). They were not
+changed: the text classifier reads the gold set worse than the extraction model
+does, so a disagreement is a reason to look, not a verdict. The five above were
+corrected because a human read them and the convention was unambiguous.
+
 ## 7. Coverage boundary
 
 **This is not "all Executive Orders."** The Federal Register API's full-text
@@ -411,12 +443,14 @@ A checklist for not overstating what is here.
 6. **Say "parseable deadlines"** if you quote deadline medians.
 7. **Treat `other` (7.3%) as a taxonomy limit**, not as a finding about the
    orders.
-8. **Do not treat the gold-set agreement as precision.** Twenty labels, written
+8. **Say that five topic labels are hand-corrected** if you quote topic
+   counts, and that `primary_topic_as_extracted` holds the model's label. §6.8.
+9. **Do not treat the gold-set agreement as precision.** Twenty labels, written
    by a model and reviewed by a non-expert. The disputed ones were resolved on
    2026-09-04; that raised instrument agreement to 95%, which is a statement
    about 20 orders, not about 1,534.
-9. **Check the two-term problem** before any per-year rate.
-10. **Re-verify if it matters.** Join `all_claims` to `order_text` and check the
+10. **Check the two-term problem** before any per-year rate.
+11. **Re-verify if it matters.** Join `all_claims` to `order_text` and check the
     quotes yourself; the data ships with everything needed to do it.
 
 ---

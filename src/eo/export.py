@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from eo import corrections
+
 CSV = "csv"
 PARQUET = "parquet"
 
@@ -118,6 +120,26 @@ def tables(run_id: int) -> list[Table]:
     ]
 
 
+def _correct_topics(
+    columns: list[str], rows: list[tuple], fixes: list[corrections.Correction]
+) -> tuple[list[str], list[tuple]]:
+    """Apply hand corrections to primary_topic, keeping the model's label in a
+    new column so the export shows both. Same rule as analysis_db."""
+    eo, topic = columns.index("eo_number"), columns.index("primary_topic")
+    fixed = corrections.verified(fixes, {r[eo]: r[topic] for r in rows})
+    out = []
+    for r in rows:
+        fix = fixed.get(r[eo])
+        r = list(r)
+        original = r[topic]
+        if fix:
+            r[topic] = fix.to_value
+        r.insert(topic + 1, original if fix else None)
+        out.append(tuple(r))
+    columns = columns[: topic + 1] + [corrections.AS_EXTRACTED] + columns[topic + 1 :]
+    return columns, out
+
+
 def fetch(
     con: sqlite3.Connection, table: Table, run_id: int, include_text: bool
 ) -> tuple[list[str], list[tuple]]:
@@ -190,13 +212,20 @@ def export_run(
     *,
     fmt: str = CSV,
     include_text: bool = False,
+    corrections_path: Path | None = None,
 ) -> dict[str, int]:
     """Write one run to `out_dir`. Returns row counts per table."""
     out_dir.mkdir(parents=True, exist_ok=True)
     counts: dict[str, int] = {}
+    run = con.execute(
+        "SELECT model, prompt_version FROM extraction_runs WHERE run_id = ?", (run_id,)
+    ).fetchone()
+    fixes = corrections.load_for_run(corrections_path, run_id, run[0], run[1])
 
     for table in tables(run_id):
         columns, rows = fetch(con, table, run_id, include_text)
+        if table.name == "orders":
+            columns, rows = _correct_topics(columns, rows, fixes)
         path = out_dir / f"{table.name}.{fmt}"
         if fmt == PARQUET:
             write_parquet(path, columns, rows)

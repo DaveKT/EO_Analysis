@@ -1,0 +1,19 @@
+{
+  "field": "primary_topic",
+  "applies_to": {"run_id": 11, "model": "openai/gpt-oss-120b", "prompt_version": "v7"},
+  "recorded": "2026-09-05",
+  "how_found": "notebooks/analysis.ipynb, section 'Does the text support the topic labels?': a cross-validated text classifier ranked these among the orders whose text disagrees most with the label. Confirmed by reading the orders.",
+  "convention": "primary_topic is the subject domain the order operates in (gold_set.json). A Presidential Emergency Board under the Railway Labor Act exists to mediate a labor dispute; 26 of the 31 such orders in the corpus already carry labor_and_workforce, and these five are the same boilerplate.",
+  "corrections": [
+    {"eo_number": 13003, "from": "other", "to": "labor_and_workforce",
+     "reason": "Railway Labor Act emergency board (Clinton, 1996). Sibling orders are labor_and_workforce; the model answered other."},
+    {"eo_number": 13334, "from": "government_administration", "to": "labor_and_workforce",
+     "reason": "Railway Labor Act emergency board, SEPTA dispute (G.W. Bush, 2004)."},
+    {"eo_number": 13351, "from": "justice_and_law_enforcement", "to": "labor_and_workforce",
+     "reason": "Railway Labor Act emergency board, SEPTA dispute (G.W. Bush, 2004). 'Investigate' was read as law enforcement."},
+    {"eo_number": 13452, "from": "technology_and_research", "to": "labor_and_workforce",
+     "reason": "Railway Labor Act emergency board, Amtrak dispute (G.W. Bush, 2007)."},
+    {"eo_number": 14077, "from": "technology_and_research", "to": "labor_and_workforce",
+     "reason": "Railway Labor Act emergency board, national freight rail dispute (Biden, 2022)."}
+  ]
+}

@@ -403,3 +403,53 @@ def test_revocation_network_counts_each_edge_once(source, tmp_path):
     ).fetchone()[0]
     assert total == 1, "FR and model both assert this edge; it must count once"
     con.close()
+
+
+def _corrections_file(tmp_path, run_id=1, model="model-1", from_value="health"):
+    import json
+    path = tmp_path / "primary_topic.json"
+    path.write_text(json.dumps({
+        "field": "primary_topic",
+        "applies_to": {"run_id": run_id, "model": model, "prompt_version": "v7"},
+        "corrections": [{"eo_number": 101, "from": from_value, "to": "trade", "reason": "test"}],
+    }))
+    return path
+
+
+def test_a_hand_correction_replaces_the_label_and_keeps_the_original(source, tmp_path):
+    path = tmp_path / "a.db"
+    counts = analysis_db.build(source, path, 1, corrections_path=_corrections_file(tmp_path))
+    con = sqlite3.connect(path)
+    topic, original = con.execute(
+        "SELECT primary_topic, primary_topic_as_extracted FROM orders WHERE eo_number = 101"
+    ).fetchone()
+    assert (topic, original) == ("trade", "health")
+    assert counts["topic_corrections"] == 1
+
+
+def test_an_uncorrected_order_has_no_as_extracted_value(built):
+    con, _, _ = built
+    (n,) = con.execute(
+        "SELECT COUNT(*) FROM orders WHERE primary_topic_as_extracted IS NOT NULL"
+    ).fetchone()
+    assert n == 0
+
+
+def test_a_stale_correction_fails_the_build(source, tmp_path):
+    """If a re-sweep changes the label, the correction must not silently
+    overwrite the fresh answer."""
+    with pytest.raises(ValueError, match="stale"):
+        analysis_db.build(
+            source, tmp_path / "b.db", 1,
+            corrections_path=_corrections_file(tmp_path, from_value="civil_rights"),
+        )
+
+
+def test_corrections_are_pinned_to_their_run(source, tmp_path):
+    path = tmp_path / "c.db"
+    analysis_db.build(source, path, 2, corrections_path=_corrections_file(tmp_path, run_id=1))
+    con = sqlite3.connect(path)
+    (topic,) = con.execute("SELECT primary_topic FROM orders WHERE eo_number = 101").fetchone()
+    assert topic == "trade"  # run 2's own label, untouched
+    (n,) = con.execute("SELECT COUNT(*) FROM orders WHERE primary_topic_as_extracted IS NOT NULL").fetchone()
+    assert n == 0

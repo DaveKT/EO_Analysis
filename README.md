@@ -95,7 +95,7 @@ everything joins.
 
 ```
 run_metadata             1  which model, prompt, cost, coverage — read this first
-orders               1,534  PK document_number, UNIQUE eo_number
+orders               1,534  PK document_number, UNIQUE eo_number; 5 topic labels hand-corrected, model's kept alongside
 order_text           1,534  body_text, split out because it is 15 MB
 order_secondary_topics 313  the JSON array exploded into joinable rows
 agencies_tasked      3,195  id PK -> orders
@@ -487,7 +487,9 @@ subset, not all deadlines.
 
 Full decomposition and the rest of the known limits: [DATA_QUALITY.md](DATA_QUALITY.md).
 
-**7.3% of orders (112/1,534) answered `other` on one axis or the other**, against
+**7.3% of orders (112/1,534) answered `other` on one axis or the other** in the
+run as the model wrote it (`analysis.db` shows one fewer on the topic axis after a
+hand correction, DATA_QUALITY §6.8), against
 a 3% threshold. This gate exists to make vocabulary gaps loud — it is how
 `education` was found — so a failure here is information, not a defect. The
 extraction itself is sound: every `other` row carries a recorded free-text reason,
