@@ -177,6 +177,18 @@ Trump 47 cancelled 132 in under two years, 112 of them Biden's — more than any
 predecessor managed in a full term. Only Clinton and G.W. Bush reached far back:
 Clinton cancelled 17 Reagan and 14 Bush 41 orders.
 
+![Cancellations of executive orders, by administration](docs/figures/cancellations_by_administration.png)
+
+**How to read it.** One bar per administration, oldest at the top. The blue
+segment is the number of *another* president's orders it revoked, rescinded or
+superseded; the orange segment is the number of its *own* orders it cancelled.
+The label at the end of each bar gives both counts. The first four bars are
+full terms; Trump 47's is nineteen months. What to notice: the blue segments
+are roughly level for thirty years and then double under Biden and double again
+under Trump 47, while the orange segment, which was once the larger part of
+Clinton's bar, all but vanishes — recent administrations cancel their
+predecessors' orders, not their own.
+
 ### How long an order survives
 
 Kaplan–Meier survival, with orders not yet revoked censored at the corpus end:
@@ -197,6 +209,19 @@ earlier signer, revocation within four years was mostly the signer's own doing;
 for Trump 45 and Biden it was overwhelmingly the successor (27% and 63% of their
 orders).
 
+![Survival of executive orders, by signer (Kaplan–Meier)](docs/figures/survival_by_signer.png)
+
+**How to read it.** Each line follows the orders one president signed and
+shows the share still in force as the years pass since signing. Every step down
+is a revocation. A line ends where that president's follow-up ends — Clinton's
+orders have been watched for thirty years, Trump 47's for under two — and the
+method (Kaplan–Meier) makes lines of different length comparable by counting
+each order only for as long as it has actually been observed. What to notice:
+Clinton, G.W. Bush and Obama are one line, drifting gently to about 75% and
+then flat, and the two recent lines break away from it. Biden's drops almost
+vertically at the four-year mark, which is the moment his successor took
+office.
+
 ### What gets reversed
 
 A logistic model of reversal by the immediate successor within 18 months, on
@@ -214,6 +239,21 @@ fixed:
 
 Every succession in this corpus is also a change of party, so "reversed by the
 successor" and "reversed by the other party" cannot be separated here.
+
+![What gets reversed, holding signer fixed](docs/figures/what_gets_reversed.png)
+
+**How to read it.** Each row is one feature of an order. The dot is its odds
+ratio: how much more (right of the dashed line at 1) or less (left of it)
+likely an order with that feature is to be reversed by the next administration,
+compared with an otherwise similar order, once the signer is held fixed. The
+scale is logarithmic, so 2 and 0.5 are the same distance from 1. The bar is a
+90% interval from resampling the data; if it crosses the line, the data cannot
+tell the effect from zero. What to notice: the rows at the top — an immigration
+topic, a signing in the last 90 days of the term, a longer text, and having
+itself reversed a predecessor — are the marks of an order that will be undone,
+and the rows at the bottom — sanctions, trade, foreign policy — are the marks
+of one that will be left alone. The `trade` bar is tight only because no trade
+order was ever reversed and the model's regulariser had to estimate a zero.
 
 ### Whom each administration leans on
 
