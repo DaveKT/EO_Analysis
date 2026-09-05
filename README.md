@@ -1,5 +1,7 @@
 # Executive Order Analysis
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22391414.svg)](https://doi.org/10.5281/zenodo.22391414)
+
 A source-verified, queryable dataset of 1,534 U.S. Executive Orders — every order the Federal Register holds full text for, EO 12890 (December 1993) through EO 14423 (August 2026), across six presidencies — and an executed analysis of what it shows.
 
 Each order carries structured fields extracted by a language model (AI) under a fixed schema: a subject domain, the kind of action it takes, the agencies it tasks, the deadlines it sets, the statutes it invokes, and the earlier orders it revokes, amends or continues. Every extracted claim is tied to a quoted span of the source text and verified against it; nothing in the published data rests on a model's unsupported word. The Federal Register's own cross-reference notes are treated as authoritative and the model's data add to them.
@@ -190,6 +192,19 @@ corrections/          hand corrections applied at build time, with reasons
 gold/                 the hand-labelled gold set             tests/         194 tests, no network
 archive/              version 1, kept as a post-mortem
 ```
+
+## Citing this work
+
+Archived on Zenodo. Cite the concept DOI, which always resolves to the newest release:
+
+> Kolet-Tassara, David. *Executive Order Analysis: a source-verified dataset of 1,534 U.S. Executive Orders (1993-2026)*. Zenodo. https://doi.org/10.5281/zenodo.22391414
+
+| | DOI |
+|---|---|
+| All versions (use this) | [10.5281/zenodo.22391414](https://doi.org/10.5281/zenodo.22391414) |
+| v1.0.0, pinned | [10.5281/zenodo.22391415](https://doi.org/10.5281/zenodo.22391415) |
+
+If you are reproducing a specific number, cite the pinned version DOI — the figures in this README come from the run archived there. Machine-readable metadata is in [CITATION.cff](CITATION.cff).
 
 ## Licence
 
