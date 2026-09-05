@@ -33,6 +33,12 @@ It is a 24 MB download on first open. Start with the `revocation_network`,
 [cheat sheet](docs/INVESTIGATORS_CHEAT_SHEET.md) first: four of the obvious
 queries are wrong by default.
 
+**See the analysis itself.** Every finding below comes from
+[notebooks/analysis.ipynb](notebooks/analysis.ipynb), which GitHub renders with
+its outputs: the queries, the charts (including several not reproduced here),
+and the caveats stated beside each result. It was committed only after being
+executed, so what you see there is what the code produced.
+
 | To … | Read |
 |---|---|
 | Query without tripping over the data | [docs/INVESTIGATORS_CHEAT_SHEET.md](docs/INVESTIGATORS_CHEAT_SHEET.md) |
