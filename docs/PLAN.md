@@ -1,11 +1,14 @@
 # Executive Order Analysis — Development Plan
 
-**Status: the data side is complete and paused.** The full corpus is extracted
-(run 11, 1,534 orders, $1.05), exported, and packaged as a standalone analysis
-database with normalised agency names. Seven of eight gates pass; the `other`
-rate gate fails at 7.3%, which is a recorded finding, not an open defect.
-**Analysis is the next phase and has not started.**
-Written 2026-09-03; updated 2026-09-04 when the data side closed.
+**Status: the data side is complete; analysis is under way.** The full corpus is
+extracted (run 11, 1,534 orders, $1.05), exported, and packaged as a standalone
+analysis database with normalised agency names and five hand-corrected labels.
+Seven of eight gates pass; the `other` rate gate fails at 7.3%, which is a
+recorded finding, not an open defect. **The analysis notebook has nine executed
+sections** (see "Analysis so far" below); the analysis found and fixed three data
+defects along the way, and produced the dataset's first recall measurement.
+Written 2026-09-03; updated 2026-09-04 when the data side closed and 2026-09-05
+after the first analysis pass and the documentation restructure.
 **Read this first if you are a fresh session picking up the work.**
 
 Four companion documents carry what this plan does not:
@@ -37,9 +40,11 @@ list of traps — *the first thing to read before querying*;
 | 5c Agency normalisation | done | 1,146 raw names -> 598 canonical, 82% matched |
 | 5d Documentation | done | quality, dictionary + ERD, cheat sheet |
 | 5f Publication | done | `data/analysis.db` + `data/export/` committed |
-| 5e Notebook | started | `notebooks/analysis.ipynb`, executed; setup + sanity checks |
-| 6 Analysis | **next** | the user's own work, against `data/analysis.db` |
-| 7 Optional | not started | taxonomy v8, pre-1994 backfill, `--since`, dashboard |
+| 5e Notebook | done | `notebooks/analysis.ipynb`, committed only after execution |
+| 5g Hand corrections | done | `corrections/primary_topic.json`, applied at build, model's label kept |
+| 5h Docs restructure | done | README = overview/method/results; operations in `docs/SETUP.md`; docs in `docs/` |
+| 6 Analysis | **in progress** | nine sections, 2026-09-04/05; see "Analysis so far" |
+| 7 Optional | not started | taxonomy v8, authorities re-extraction, pre-1994 backfill, `--since`, dashboard |
 
 ### The state in the database (`data/eo.db`, gitignored, rebuildable)
 
@@ -156,6 +161,60 @@ groundedness            94.0%  (reported)
 another $1.05 on a v8 re-sweep. The dataset is complete and every `other` row
 carries its reason, so the gap is traceable rather than hidden.
 
+### Analysis so far (2026-09-05)
+
+Nine sections in `notebooks/analysis.ipynb`, each stating its query and its
+caveats inline; the README's Results section summarises the findings. In order:
+
+1. **Cancellations of a predecessor's orders by administration.** Built its own
+   edge set: authoritative `revokes`/`rescinds`/`supersedes`, a dozen inbound FR
+   notes flipped, targets outside the corpus attributed by EO number range (the
+   `revocation_network` view drops them and would have hidden every Clinton
+   cancellation of a Reagan or Bush 41 order), Trump split into two terms, and a
+   date rule dropping forward edges whose target postdates the actor. Break at
+   2021: Biden 96, Trump 47 132 in under two years.
+2. **Which agencies each administration leaned on.** Distinct-order shares through
+   `agency_taskings`; heatmap of the twelve most-tasked agencies.
+3. **Topic mix by administration.** Shares and a diverging heatmap of departures
+   from the corpus average.
+4. **Text audit of `primary_topic`.** Balanced linear SVM over TF-IDF,
+   cross-validated against the model's labels: 70% agreement; a ranked review list;
+   the text model reads gold worse than the extraction model (12/20 vs 18/20), so
+   disagreements are candidates, not verdicts. Distinctive vocabulary per
+   administration by log-odds with a Dirichlet prior.
+5. **Survival analysis.** Kaplan-Meier by signer, Aalen-Johansen competing risks
+   (signer vs successor), survival by instrument. Clinton/Bush/Obama share one
+   curve (~75% in force after decades); Trump 45 67% and Biden 31% at four years.
+6. **What gets reversed.** Logistic model of reversal by the immediate successor
+   within 18 months (AUC 0.83): tit-for-tat OR 1.8, last-90-days OR 2.3, sanctions
+   and foreign policy OR 0.3, trade never reversed (0/35).
+7. **Legal authority.** The "By the authority vested in me" clause parsed for
+   98.8% of orders and normalised; 55% cite no statute (40% Clinton -> 72% Trump
+   47); emergency powers in 16-17% of orders since Obama.
+8. **Statute-vs-topic audit.** A second, independent check on `primary_topic`;
+   72 candidates, 65 also flagged by the text audit, mostly sanctions orders
+   labelled `justice_and_law_enforcement` or `other`.
+9. (The setup and sanity-check cells at the top, which re-verify all 8,989 quotes
+   and assert on it.)
+
+**What the analysis changed in the data**, each with a test and a commit:
+
+- The bare `president` alias absorbed 105 mentions of "President's Council on ..."
+  bodies and "Assistant to the President for ..." officials; guarded (2026-09-04).
+- The disposition parser did not accept a parenthetical in a label
+  ("Superseded by (in part):"), so a Biden order appeared to supersede a Trump 47
+  order; fixed and re-seeded, 3,924 -> 3,925 FR edges (2026-09-04). Fourteen
+  further inversions are the Register's own notes and are documented, not
+  repaired (DATA_QUALITY §6.3).
+- Five Railway Labor Act emergency-board orders carried four different topic
+  labels; corrected through the corrections file (2026-09-05).
+- The documented "re-verify the quotes yourself" SQL only proved every claim had
+  a text; the real check needs the normaliser. Docs now carry the Python recipe.
+- **First measured recall.** The `authorities` table names IEEPA in 45% of the
+  orders whose preamble invokes it, the National Emergencies Act in 29%, and
+  3 U.S.C. 301 in 7% (DATA_QUALITY §6.2). Authority questions should parse the
+  preamble.
+
 ### How to run it
 
 ```sh
@@ -179,8 +238,8 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
 1. ~~Frontier-model comparison~~ **Done 2026-09-04, run 10.** See above. It
    answered the question it was for: the topic ceiling is the model's, not the
    task's, and the cheap sweep is still the right call at 1/36th the cost.
-2. **Decide the three contested instrument labels** (below) before the sweep
-   treats the gold set as ground truth. Costs nothing, needs a human.
+2. ~~Decide the three contested instrument labels~~ **Done 2026-09-04** by hand
+   review; see "Still open" below.
 3. ~~Phase 5 full sweep~~ **Done 2026-09-04, run 11.** See above.
 4. ~~`eo export`~~ **Done 2026-09-04.** One run to flat files plus a provenance
    manifest, scoped to a single `run_id`. `eo analysis-db` followed, packaging the
@@ -207,8 +266,20 @@ The OpenRouter key is read from **`eo_openrouterkey` and no other name**.
    President for ..." officials. `Department of War` merges into
    `Department of Defense` per the user's decision on 2026-09-04 (EO 14347 renamed
    it; it is one institution), with the period recoverable from `raw_name`.
-7. **Analysis is the next phase**, against `data/analysis.db`. Nothing on the data
-   side is blocking it.
+7. ~~Analysis is the next phase~~ **In progress**; nine sections as of
+   2026-09-05, listed above. Nothing on the data side blocks further questions.
+8. **Next, in rough order:**
+   - Read the 72 statute-vs-topic candidates and correct the clear ones (the eight
+     sanctions orders labelled `other` first) through `corrections/primary_topic.json`.
+   - Decide what to do about `authorities` recall: either parse the preamble in the
+     pipeline as a deterministic field (no model cost; the notebook's parser is the
+     prototype) or re-extract that field alone with a prompt that asks for the
+     preamble statutes explicitly.
+   - Deadline parsing (below), which caps the deadline analysis at ~40% of rows.
+   - Timing questions the cheat sheet already supports: orders per month with term
+     boundaries, first-100-days intensity per term, final-90-days volume.
+   - Re-run the survival and reversal sections once Trump 47 has more follow-up;
+     its curves are marked as not reached at four years.
 
 ### Hand corrections (added 2026-09-05)
 
@@ -238,6 +309,13 @@ correcting anything else: read the order, check the convention in
   duration, so median-deadline figures cover the parseable subset only. There is
   no parser in the codebase; the definition is pinned in DATA_QUALITY §6.5, and
   the count moves with it (923 if spelled-out numbers count).
+- **72 `primary_topic` candidates from the two audits** (notebook sections 4 and
+  8), 65 flagged by both. Not corrected: a candidate is a reason to read the
+  order, not a verdict. The eight sanctions orders labelled `other` are the
+  clearest.
+- **`authorities` recall is low and now measured** (45% / 29% / 7% for IEEPA,
+  NEA, 3 U.S.C. 301). The preamble parse in the notebook is the workaround; see
+  "What to do next" for the two ways to fix the field itself.
 - **Instrument taxonomy v8**: `continues_body` plus precedence clarity, *not* a
   pile of new categories. ~40 of the 112 `other` rows had a correct category
   available and did not use it, so the dominant fix is prompt clarity. A re-sweep
